@@ -1437,7 +1437,7 @@ function renderAdminUsers() {
       <tbody>
         ${rows.map(([uid, u]) => `
           <tr>
-            <td>${u.prenom||""} ${u.nom||""}</td>
+            <td>${u.prenom||""} ${(u.nom||"").toUpperCase()}</td>
             <td style="font-size:12px">${u.email||""}</td>
             <td>
               <select onchange="changerRole('${uid}', this.value)" style="width:auto;margin:0;padding:4px 8px;font-size:12px">
@@ -1446,7 +1446,19 @@ function renderAdminUsers() {
                 <option value="admin"    ${u.role==="admin"   ?"selected":""}>Admin</option>
               </select>
             </td>
-            <td><span class="filiere-tag">${u.filiere||"—"}</span></td>
+            <td>
+              <select onchange="changerFiliere('${uid}', this.value)" style="width:auto;margin:0;padding:4px 8px;font-size:12px;border-radius:6px;border:1.5px solid var(--gris2)">
+                <option value=""          ${!u.filiere||u.filiere===""?"selected":""}>— Staff SUAPS —</option>
+                <option value="Gestion"        ${u.filiere==="Gestion"       ?"selected":""}>Gestion</option>
+                <option value="Économie"       ${u.filiere==="Économie"      ?"selected":""}>Économie</option>
+                <option value="Informatique"   ${u.filiere==="Informatique"  ?"selected":""}>Informatique (MIAGE)</option>
+                <option value="Mathématiques"  ${u.filiere==="Mathématiques" ?"selected":""}>Mathématiques</option>
+                <option value="Droit"          ${u.filiere==="Droit"         ?"selected":""}>Droit</option>
+                <option value="Finance"        ${u.filiere==="Finance"       ?"selected":""}>Finance</option>
+                <option value="Commerce"       ${u.filiere==="Commerce"      ?"selected":""}>Commerce International</option>
+                <option value="Autre"          ${u.filiere==="Autre"         ?"selected":""}>Autre filière</option>
+              </select>
+            </td>
             <td><span style="font-size:11px;color:var(--muted)">${new Date(u.createdAt||0).toLocaleDateString("fr-FR")}</span></td>
           </tr>
         `).join("")}
@@ -1458,6 +1470,13 @@ function renderAdminUsers() {
 async function changerRole(uid, newRole) {
   await update(ref(db, `users/${uid}`), { role: newRole });
 }
+
+async function changerFiliere(uid, newFiliere) {
+  // Mettre à jour dans users ET dans resultats/meta pour cohérence
+  await update(ref(db, `users/${uid}`), { filiere: newFiliere });
+  await update(ref(db, `resultats/${uid}/meta`), { filiere: newFiliere });
+}
+window.changerFiliere = changerFiliere;
 
 async function supprimerEtudiant(uid) {
   // Récupérer le nom pour confirmation
