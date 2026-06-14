@@ -413,8 +413,18 @@
       </div>
       <div class="form-group">
         <label>Mot de passe</label>
-        <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
+        <div style="position:relative">
+          <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"
+            style="margin-bottom:0;padding-right:44px">
+          <button type="button" onclick="toggleVisu('login-pass',this)"
+            style="position:absolute;right:0;top:0;height:100%;width:42px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:17px;display:flex;align-items:center;justify-content:center"
+            aria-label="Afficher le mot de passe">👁</button>
+        </div>
+        <div style="text-align:right;margin-top:6px">
+          <a onclick="motDePasseOublie()" style="font-size:12px;color:var(--bleu);cursor:pointer;text-decoration:none">Mot de passe oublié ?</a>
+        </div>
       </div>
+      <div class="msg" id="reset-msg" style="margin-bottom:10px"></div>
       <button class="btn btn-primary" onclick="doLogin()">Se connecter</button>
       <div class="toggle-link">Pas encore de compte ? <a onclick="showRegister()">S'inscrire</a></div>
     </div>
@@ -459,7 +469,13 @@
       </div>
       <div class="form-group">
         <label>Mot de passe</label>
-        <input type="password" id="reg-pass" placeholder="8 caractères minimum">
+        <div style="position:relative">
+          <input type="password" id="reg-pass" placeholder="8 caractères minimum"
+            style="margin-bottom:0;padding-right:44px">
+          <button type="button" onclick="toggleVisu('reg-pass',this)"
+            style="position:absolute;right:0;top:0;height:100%;width:42px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:17px;display:flex;align-items:center;justify-content:center"
+            aria-label="Afficher le mot de passe">👁</button>
+        </div>
       </div>
       <button class="btn btn-primary" onclick="doRegister()">Créer mon compte</button>
       <div class="toggle-link">Déjà un compte ? <a onclick="showLogin()">Se connecter</a></div>
@@ -642,6 +658,35 @@ let allResultats = {};
 let allUsers    = {};
 let editUID     = null;
 const ADMIN_EMAIL = "admin@dauphine.psl.eu"; // ← à adapter
+
+window.toggleVisu = function(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    btn.textContent = '🙈';
+    btn.setAttribute('aria-label', 'Masquer le mot de passe');
+  } else {
+    inp.type = 'password';
+    btn.textContent = '👁';
+    btn.setAttribute('aria-label', 'Afficher le mot de passe');
+  }
+};
+
+window.motDePasseOublie = async function() {
+  const prefix = document.getElementById('login-email-prefix').value.trim();
+  if (!prefix) {
+    showMsg('reset-msg', 'Saisissez d\'abord votre identifiant (partie avant @dauphine.psl.eu).', 'error');
+    return;
+  }
+  const email = prefix + '@dauphine.psl.eu';
+  try {
+    const { sendPasswordResetEmail } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+    await sendPasswordResetEmail(auth, email);
+    showMsg('reset-msg', '✓ Email envoyé à ' + email + ' — vérifiez votre boîte mail.', 'success');
+  } catch(e) {
+    showMsg('reset-msg', 'Adresse introuvable. Vérifiez l\'identifiant saisi.', 'error');
+  }
+};
 
 window.showLogin    = showLogin;
 window.showRegister = showRegister;
