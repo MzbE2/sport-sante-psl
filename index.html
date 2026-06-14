@@ -162,6 +162,57 @@
   }
   .btn-sm { padding: 5px 11px; font-size: 12px; width: auto; }
 
+  /* ===== BARRE UTILISATEUR ===== */
+  #user-bar {
+    display: none;
+    background: white;
+    border-bottom: 1px solid var(--gris2);
+    padding: 8px 20px;
+    align-items: center;
+    gap: 10px;
+  }
+  #user-bar.visible { display: flex; }
+  .user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 14px;
+    flex-shrink: 0;
+    color: white;
+  }
+  .avatar-etudiant { background: var(--bleu); }
+  .avatar-prof     { background: var(--vert); }
+  .avatar-admin    { background: var(--rouge); }
+  .user-info { flex: 1; min-width: 0; }
+  .user-name {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--texte);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .user-role {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+  .role-pill {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .pill-etudiant { background: var(--bleu-cl); color: var(--bleu); }
+  .pill-prof     { background: var(--vert-cl); color: var(--vert); }
+  .pill-admin    { background: var(--rouge-cl); color: var(--rouge); }
+
   /* ===== TABS ===== */
   .tabs {
     display: flex;
@@ -436,6 +487,18 @@
   <div class="header-logo">Sport Santé <span>PSL Dauphine</span></div>
   <button id="btn-logout" onclick="logout()">Déconnexion</button>
 </header>
+
+<!-- ============================================================ -->
+<!--  BARRE UTILISATEUR CONNECTÉ                                  -->
+<!-- ============================================================ -->
+<div id="user-bar">
+  <div class="user-avatar" id="user-avatar"></div>
+  <div class="user-info">
+    <div class="user-name" id="user-fullname"></div>
+    <div class="user-role" id="user-email-display"></div>
+  </div>
+  <span class="role-pill" id="user-role-pill"></span>
+</div>
 
 <!-- ============================================================ -->
 <!--  PAGE LOGIN / INSCRIPTION                                    -->
@@ -792,6 +855,28 @@ let allUsers    = {};
 let editUID     = null;
 const ADMIN_EMAIL = "admin@dauphine.psl.eu"; // ← à adapter
 
+function updateUserBar(data) {
+  const roleLabels = { etudiant: "Étudiant·e", prof: "Prof SUAPS", admin: "Administrateur" };
+  const roleClasses = { etudiant: "etudiant", prof: "prof", admin: "admin" };
+  const r = data.role || "etudiant";
+  const prenom = data.prenom || "";
+  const nom    = (data.nom || "").toUpperCase();
+  const initiales = ((prenom[0]||"") + (data.nom?.[0]||"")).toUpperCase();
+
+  document.getElementById("user-fullname").textContent = `${prenom} ${nom}`;
+  document.getElementById("user-email-display").textContent = data.email || "";
+
+  const avatar = document.getElementById("user-avatar");
+  avatar.textContent = initiales;
+  avatar.className = `user-avatar avatar-${roleClasses[r]}`;
+
+  const pill = document.getElementById("user-role-pill");
+  pill.textContent = roleLabels[r] || r;
+  pill.className = `role-pill pill-${roleClasses[r]}`;
+
+  document.getElementById("user-bar").classList.add("visible");
+}
+
 window.toggleVisu = function(inputId, btn) {
   const inp = document.getElementById(inputId);
   if (inp.type === 'password') {
@@ -848,6 +933,7 @@ onAuthStateChanged(auth, async (user) => {
       currentRole = data.role || "etudiant";
       document.getElementById("btn-logout").style.display = "block";
       showPage(currentRole);
+      updateUserBar(data);
       if (currentRole === "etudiant") initEtudiant(user.uid, data);
       if (currentRole === "prof")     initProf();
       if (currentRole === "admin")    initAdmin();
@@ -959,6 +1045,7 @@ async function doRegister() {
     currentRole = role;
     document.getElementById("btn-logout").style.display = "block";
     showPage(role);
+    updateUserBar({ prenom, nom, email, filiere, role });
     if (role === "etudiant") initEtudiant(uid, { prenom, nom, email, filiere, role });
     if (role === "prof")     initProf();
     if (role === "admin")    initAdmin();
@@ -977,6 +1064,7 @@ async function doRegister() {
 
 async function logout() {
   await signOut(auth);
+  document.getElementById("user-bar").classList.remove("visible");
 }
 
 // ── ÉTUDIANT ─────────────────────────────────────────────────
