@@ -1028,10 +1028,31 @@ async function doRegister() {
   // Feedback visuel immédiat
   const btnRegister = document.querySelector('#form-register .btn-primary');
   const originalText = btnRegister.textContent;
-  btnRegister.textContent = "Création en cours…";
+  btnRegister.textContent = "Vérification…";
   btnRegister.disabled = true;
 
   try {
+    // ── Vérification anti-doublon prénom+nom ──────────────────────
+    const usersSnap = await get(ref(db, "users"));
+    if (usersSnap.exists()) {
+      const usersData = usersSnap.val();
+      const doublon = Object.values(usersData).find(u =>
+        u.prenom?.toLowerCase().trim() === prenom.toLowerCase() &&
+        u.nom?.toLowerCase().trim()    === nom.toLowerCase()
+      );
+      if (doublon) {
+        btnRegister.textContent = originalText;
+        btnRegister.disabled = false;
+        showMsg("register-msg",
+          `⚠️ Un compte existe déjà pour ${prenom} ${nom.toUpperCase()} (${doublon.email}). ` +
+          `Si c'est vous, utilisez "Se connecter" ou "Mot de passe oublié".`
+        );
+        return;
+      }
+    }
+
+    btnRegister.textContent = "Création en cours…";
+
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
     const uid = cred.user.uid;
 
