@@ -160,7 +160,7 @@
     padding: 7px 14px;
     font-size: 13px;
   }
-  .btn-sm { padding: 5px 11px; font-size: 12px; width: auto; }
+  .btn-sm { padding: 5px 8px; font-size: 12px; width: auto; }
 
   /* ===== BARRE UTILISATEUR ===== */
   #user-bar {
@@ -242,7 +242,7 @@
   }
 
   /* ===== CONTENT AREA ===== */
-  .content { padding: 20px 16px; max-width: 700px; margin: 0 auto; }
+  .content { padding: 20px 16px; max-width: 980px; margin: 0 auto; }
 
   /* ===== CARDS ===== */
   .card {
@@ -337,18 +337,20 @@
   .badge-wait { background: var(--or-cl); color: var(--orange); padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 
   /* ===== ADMIN TABLE ===== */
-  .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto; }
   .admin-table th {
     background: var(--bleu);
     color: white;
-    padding: 9px 10px;
+    padding: 8px 8px;
     text-align: left;
     font-weight: 600;
     font-size: 12px;
+    white-space: nowrap;
   }
-  .admin-table td { padding: 9px 10px; border-bottom: 1px solid var(--gris2); }
+  .admin-table td { padding: 8px 8px; border-bottom: 1px solid var(--gris2); white-space: nowrap; }
+  .admin-table td:first-child { white-space: normal; min-width: 140px; }
   .admin-table tr:hover td { background: var(--gris); }
-  .admin-table .actions { display: flex; gap: 6px; }
+  .admin-table .actions { display: flex; gap: 4px; flex-wrap: nowrap; }
 
   /* ===== MESSAGES ===== */
   .msg {
@@ -701,7 +703,7 @@
 
   <!-- Résultats -->
   <div id="tab-admin-resultats" class="content" style="display:none">
-    <div class="card" style="overflow-x:auto">
+    <div class="card">
       <h3>📋 Tous les résultats</h3>
       <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap">
         <select id="admin-filtre-filiere" onchange="adminFiltrerResultats()" style="width:auto; margin-bottom:0; flex:1">
@@ -1394,7 +1396,7 @@ function renderAdminResultats() {
       <tbody>
         ${rows.map(([uid, r]) => `
           <tr>
-            <td><strong>${r.meta?.prenom||""} ${r.meta?.nom||""}</strong><br><span style="color:var(--muted);font-size:11px">${r.meta?.email||""}</span></td>
+            <td><strong style="font-size:13px">${r.meta?.prenom||""} ${(r.meta?.nom||"").toUpperCase()}</strong><br><span style="color:var(--muted);font-size:10px">${r.meta?.email||""}</span></td>
             <td><span class="filiere-tag">${r.meta?.filiere||"—"}</span></td>
             ${TESTS.map(t => `<td>${r.tests?.[t.id] !== undefined ? r.tests[t.id] + " " + t.unite : "—"}</td>`).join("")}
             <td>${r.meta?.valide
