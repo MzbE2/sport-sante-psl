@@ -65,8 +65,9 @@
   #btn-logout:hover { background: rgba(255,255,255,0.25); }
 
   /* ===== PAGES ===== */
-  .page { display: none; }
-  .page.active { display: block; }
+  .page { display: none !important; }
+  .page.active { display: block !important; }
+  #page-login.active { display: flex !important; }
 
   /* ===== LOGIN ===== */
   #page-login {
@@ -394,7 +395,14 @@
       <div class="msg" id="login-msg"></div>
       <div class="form-group">
         <label>Email</label>
-        <input type="email" id="login-email" placeholder="prenom.nom@dauphine.psl.eu" autocomplete="email">
+        <div style="display:flex;align-items:stretch;gap:0">
+          <input type="text" id="login-email-prefix" placeholder="prenom.nom"
+            autocomplete="username"
+            style="border-radius:var(--radius) 0 0 var(--radius);border-right:none;flex:1;margin-bottom:0"
+            oninput="document.getElementById('login-email').value=this.value+'@dauphine.psl.eu'">
+          <span style="background:var(--gris);border:1.5px solid var(--gris2);border-left:none;border-radius:0 var(--radius) var(--radius) 0;padding:10px 10px;font-size:13px;color:var(--muted);white-space:nowrap;display:flex;align-items:center">@dauphine.psl.eu</span>
+        </div>
+        <input type="hidden" id="login-email">
       </div>
       <div class="form-group">
         <label>Mot de passe</label>
@@ -419,7 +427,14 @@
       </div>
       <div class="form-group">
         <label>Email universitaire</label>
-        <input type="email" id="reg-email" placeholder="marie.dupont@dauphine.psl.eu">
+        <div style="display:flex;align-items:stretch;gap:0">
+          <input type="text" id="reg-email-prefix" placeholder="prenom.nom"
+            autocomplete="username"
+            style="border-radius:var(--radius) 0 0 var(--radius);border-right:none;flex:1;margin-bottom:0"
+            oninput="document.getElementById('reg-email').value=this.value+'@dauphine.psl.eu'">
+          <span style="background:var(--gris);border:1.5px solid var(--gris2);border-left:none;border-radius:0 var(--radius) var(--radius) 0;padding:10px 10px;font-size:13px;color:var(--muted);white-space:nowrap;display:flex;align-items:center">@dauphine.psl.eu</span>
+        </div>
+        <input type="hidden" id="reg-email">
       </div>
       <div class="form-group">
         <label>Filière (étudiants L1 uniquement)</label>
