@@ -901,9 +901,17 @@ async function doLogin() {
   if (!email || !pass) return showMsg("login-msg", "Veuillez remplir tous les champs.");
   if (!email.endsWith("@dauphine.psl.eu") && !email.endsWith("@psl.eu"))
     return showMsg("login-msg", "Seuls les emails @dauphine.psl.eu ou @psl.eu sont autorisés.");
+  const btnLogin = document.querySelector('#form-login .btn-primary');
+  const originalLoginText = btnLogin.textContent;
+  btnLogin.textContent = "Connexion…";
+  btnLogin.disabled = true;
+
   try {
     await signInWithEmailAndPassword(auth, email, pass);
+    // onAuthStateChanged prend le relais
   } catch(e) {
+    btnLogin.textContent = originalLoginText;
+    btnLogin.disabled = false;
     showMsg("login-msg", "Email ou mot de passe incorrect.");
   }
 }
@@ -924,22 +932,44 @@ async function doRegister() {
   // Rôle par défaut : etudiant. Les profs seront promus par l'admin.
   const role = (email === ADMIN_EMAIL) ? "admin" : "etudiant";
 
+  // Feedback visuel immédiat
+  const btnRegister = document.querySelector('#form-register .btn-primary');
+  const originalText = btnRegister.textContent;
+  btnRegister.textContent = "Création en cours…";
+  btnRegister.disabled = true;
+
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    await set(ref(db, `users/${cred.user.uid}`), {
+    const uid = cred.user.uid;
+
+    await set(ref(db, `users/${uid}`), {
       prenom, nom, email, filiere, role,
       createdAt: Date.now()
     });
-    // Créer une entrée résultats vide
-    await set(ref(db, `resultats/${cred.user.uid}/meta`), {
+
+    await set(ref(db, `resultats/${uid}/meta`), {
       prenom, nom, email, filiere,
       session: new Date().toISOString().slice(0, 7),
       valide: false,
       createdAt: Date.now()
     });
+
+    // Redirection explicite sans attendre onAuthStateChanged
+    currentUser = cred.user;
+    currentRole = role;
+    document.getElementById("btn-logout").style.display = "block";
+    showPage(role);
+    if (role === "etudiant") initEtudiant(uid, { prenom, nom, email, filiere, role });
+    if (role === "prof")     initProf();
+    if (role === "admin")    initAdmin();
+
   } catch(e) {
+    btnRegister.textContent = originalText;
+    btnRegister.disabled = false;
     if (e.code === "auth/email-already-in-use")
       showMsg("register-msg", "Un compte existe déjà avec cet email.");
+    else if (e.code === "auth/weak-password")
+      showMsg("register-msg", "Mot de passe trop faible (8 caractères minimum).");
     else
       showMsg("register-msg", "Erreur : " + e.message);
   }
