@@ -749,72 +749,76 @@
 <!--  ÉCRAN SUCCÈS VALIDATION                                    -->
 <!-- ============================================================ -->
 <div id="succes-overlay">
-  <div class="succes-icon">🎉</div>
-  <div class="succes-titre">Bilan enregistré !</div>
-  <div class="succes-sous">Merci d'avoir participé au bilan Sport Santé PSL Dauphine.</div>
 
-  <div class="succes-carte">
-    <p>
-      <strong>🏃 Bouger, c'est investir sur soi.</strong><br>
-      L'OMS recommande <strong>150 minutes d'activité modérée par semaine</strong> pour les 18–25 ans —
-      soit environ 30 minutes par jour, 5 jours sur 7. Même une marche rapide compte !
-    </p>
-    <p>
-      <strong>💡 Le saviez-vous ?</strong><br>
-      Une activité physique régulière améliore la concentration, réduit le stress et
-      favorise un meilleur sommeil — trois atouts essentiels pour réussir vos études.
-    </p>
-    <p>
-      <strong>🤝 Le SUAPS est là pour vous.</strong><br>
-      Si votre bilan révèle des points d'attention, l'équipe du SUAPS vous proposera
-      un programme Sport Santé personnalisé et gratuit. Restez attentif à vos résultats !
-    </p>
+  <!-- En-tête compact -->
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;width:100%;max-width:900px">
+    <div class="succes-icon" style="margin:0;width:52px;height:52px;font-size:26px;flex-shrink:0">🎉</div>
+    <div style="text-align:left">
+      <div class="succes-titre" style="font-size:18px;margin-bottom:2px">Bilan enregistré !</div>
+      <div class="succes-sous" style="margin:0;font-size:13px">Merci d'avoir participé au bilan Sport Santé PSL Dauphine.</div>
+    </div>
+    <button class="btn btn-success" style="margin-left:auto;width:auto;padding:10px 20px;white-space:nowrap;flex-shrink:0" onclick="voirMesResultats()">
+      📊 Voir mes résultats
+    </button>
   </div>
 
-  <button class="btn btn-success" style="max-width:320px;width:100%;margin-bottom:28px" onclick="voirMesResultats()">
-    📊 Voir mes résultats
-  </button>
+  <!-- Corps en deux colonnes -->
+  <div style="display:flex;gap:16px;width:100%;max-width:900px;align-items:flex-start;flex-wrap:wrap">
 
-  <!-- Bloc SUAPS -->
-  <div style="max-width:480px;width:100%;background:linear-gradient(135deg,#1a3a6e 0%,#1a56a0 100%);border-radius:14px;padding:22px 20px;text-align:left;box-shadow:0 4px 20px rgba(26,86,160,0.25)">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <img src="logo.jfif" alt="Dauphine Sports" style="width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0">
-      <div>
-        <div style="color:white;font-weight:800;font-size:15px;line-height:1.2">Passez à l'action !</div>
-        <div style="color:rgba(255,255,255,0.7);font-size:12px">SUAPS · PSL Dauphine</div>
+    <!-- Colonne gauche : messages santé -->
+    <div class="succes-carte" style="flex:1;min-width:260px;margin:0">
+      <p><strong>🏃 Bouger, c'est investir sur soi.</strong><br>
+        L'OMS recommande <strong>150 min d'activité modérée/semaine</strong> pour les 18–25 ans.
+        Même une marche rapide compte !
+      </p>
+      <p style="margin-top:10px"><strong>💡 Le saviez-vous ?</strong><br>
+        L'activité physique améliore la concentration, réduit le stress et favorise un meilleur sommeil —
+        trois atouts pour réussir vos études.
+      </p>
+      <p style="margin-top:10px"><strong>🤝 Le SUAPS est là pour vous.</strong><br>
+        Si votre bilan révèle des points d'attention, l'équipe du SUAPS vous proposera
+        un programme personnalisé et gratuit.
+      </p>
+    </div>
+
+    <!-- Colonne droite : bloc SUAPS -->
+    <div style="flex:1;min-width:240px;background:linear-gradient(135deg,#1a3a6e 0%,#1a56a0 100%);border-radius:14px;padding:18px 16px;text-align:left;box-shadow:0 4px 20px rgba(26,86,160,0.25)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <img src="logo.jfif" alt="Dauphine Sports" style="width:36px;height:36px;border-radius:7px;object-fit:cover;flex-shrink:0">
+        <div>
+          <div style="color:white;font-weight:800;font-size:14px;line-height:1.2">Passez à l'action !</div>
+          <div style="color:rgba(255,255,255,0.7);font-size:11px">SUAPS · PSL Dauphine</div>
+        </div>
+      </div>
+      <p style="color:rgba(255,255,255,0.9);font-size:12px;line-height:1.55;margin-bottom:12px">
+        <strong style="color:white">40% des étudiants de Dauphine</strong> pratiquent via le SUAPS.
+        Musculation, yoga, sports collectifs, escalade… accès salle jusqu'à <strong style="color:white">22h</strong>.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <a href="https://sports.inscription.psl.eu/" target="_blank" rel="noopener"
+          style="display:flex;align-items:center;gap:8px;background:white;color:#1a56a0;border-radius:8px;padding:9px 12px;text-decoration:none;font-weight:700;font-size:12px">
+          🎽 <span>S'inscrire à PSL Sport</span><span style="margin-left:auto;opacity:0.4;font-size:10px">↗</span>
+        </a>
+        <a href="https://dauphine.psl.eu/vie-de-campus/sports" target="_blank" rel="noopener"
+          style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.12);color:white;border-radius:8px;padding:8px 12px;text-decoration:none;font-weight:600;font-size:12px;border:1px solid rgba(255,255,255,0.2)">
+          📋 <span>Toute l'offre SUAPS</span><span style="margin-left:auto;opacity:0.5;font-size:10px">↗</span>
+        </a>
+        <div style="display:flex;gap:6px">
+          <a href="https://static3.dauphine.psl.eu/fileadmin/mediatheque/sports/images/Planning_Dauphine_2526.pdf" target="_blank" rel="noopener"
+            style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;background:rgba(255,255,255,0.10);color:rgba(255,255,255,0.85);border-radius:8px;padding:8px 6px;text-decoration:none;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,0.15)">
+            📅 Dauphine
+          </a>
+          <a href="https://static3.dauphine.psl.eu/fileadmin/mediatheque/sports/images/Planning_PSL_2526.pdf" target="_blank" rel="noopener"
+            style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;background:rgba(255,255,255,0.10);color:rgba(255,255,255,0.85);border-radius:8px;padding:8px 6px;text-decoration:none;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,0.15)">
+            📅 PSL
+          </a>
+        </div>
       </div>
     </div>
-    <p style="color:rgba(255,255,255,0.9);font-size:13px;line-height:1.6;margin-bottom:16px">
-      <strong style="color:white">40% des étudiants de Dauphine</strong> pratiquent une activité sportive via le SUAPS.
-      Musculation, yoga, sports collectifs, escalade, natation… et accès à la salle jusqu'à <strong style="color:white">22h en semaine</strong>.
-    </p>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <a href="https://sports.inscription.psl.eu/" target="_blank" rel="noopener"
-        style="display:flex;align-items:center;gap:10px;background:white;color:#1a56a0;border-radius:9px;padding:11px 14px;text-decoration:none;font-weight:700;font-size:13px">
-        <span style="font-size:18px">🎽</span>
-        <span>S'inscrire à PSL Sport</span>
-        <span style="margin-left:auto;opacity:0.5;font-size:11px">↗</span>
-      </a>
-      <a href="https://dauphine.psl.eu/vie-de-campus/sports" target="_blank" rel="noopener"
-        style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.12);color:white;border-radius:9px;padding:10px 14px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid rgba(255,255,255,0.2)">
-        <span style="font-size:16px">📋</span>
-        <span>Toute l'offre sportive SUAPS</span>
-        <span style="margin-left:auto;opacity:0.6;font-size:11px">↗</span>
-      </a>
-      <div style="display:flex;gap:8px">
-        <a href="https://static3.dauphine.psl.eu/fileadmin/mediatheque/sports/images/Planning_Dauphine_2526.pdf" target="_blank" rel="noopener"
-          style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:rgba(255,255,255,0.10);color:rgba(255,255,255,0.85);border-radius:9px;padding:9px 10px;text-decoration:none;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.15)">
-          📅 Planning Dauphine
-        </a>
-        <a href="https://static3.dauphine.psl.eu/fileadmin/mediatheque/sports/images/Planning_PSL_2526.pdf" target="_blank" rel="noopener"
-          style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:rgba(255,255,255,0.10);color:rgba(255,255,255,0.85);border-radius:9px;padding:9px 10px;text-decoration:none;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.15)">
-          📅 Planning PSL
-        </a>
-      </div>
-    </div>
+
   </div>
 
-  <div style="margin-top:16px">
+  <div style="margin-top:14px">
     <a onclick="fermerSucces()" style="font-size:13px;color:var(--muted);cursor:pointer">Retour à la saisie</a>
   </div>
 </div>
