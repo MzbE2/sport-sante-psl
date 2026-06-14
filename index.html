@@ -421,13 +421,17 @@
   #succes-overlay {
     display: none;
     position: fixed;
-    inset: 0;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: white;
-    z-index: 150;
-    align-items: center;
+    z-index: 90;
+    align-items: flex-start;
     justify-content: center;
-    padding: 24px;
+    padding: 32px 20px 40px;
     text-align: center;
+    overflow-y: auto;
     animation: fadeIn 0.4s ease;
   }
   #succes-overlay.open { display: flex; flex-direction: column; }
@@ -915,7 +919,7 @@ window.showTab      = showTab;
 window.validerSaisie       = validerSaisie;
 window.filtrerEtudiants    = filtrerEtudiants;
 window.adminFiltrerResultats = adminFiltrerResultats;
-window.supprimerResultat   = supprimerResultat;
+window.supprimerEtudiant   = supprimerEtudiant;
 window.ouvrirEdit          = ouvrirEdit;
 window.saveEdit            = saveEdit;
 window.closeModal          = closeModal;
@@ -952,6 +956,9 @@ function showPage(role) {
   const map = { login: "page-login", etudiant: "page-etudiant", prof: "page-prof", admin: "page-admin" };
   const pg = document.getElementById(map[role] || "page-login");
   if (pg) pg.classList.add("active");
+  // Toujours fermer l'overlay succès lors d'un changement de page
+  const overlay = document.getElementById("succes-overlay");
+  if (overlay) overlay.classList.remove("open");
 }
 
 function showLogin() {
@@ -1065,6 +1072,7 @@ async function doRegister() {
 async function logout() {
   await signOut(auth);
   document.getElementById("user-bar").classList.remove("visible");
+  document.getElementById("succes-overlay").classList.remove("open");
 }
 
 // ── ÉTUDIANT ─────────────────────────────────────────────────
@@ -1131,7 +1139,9 @@ async function validerSaisie() {
   // Tous les tests sont saisis → valider
   await update(ref(db, `resultats/${uid}/meta`), { valide: true, validatedAt: Date.now() });
   document.getElementById("rappel-tests").style.display = "none";
-  document.getElementById("succes-overlay").classList.add("open");
+  if (currentRole === "etudiant") {
+    document.getElementById("succes-overlay").classList.add("open");
+  }
 }
 
 function afficherRappelTests(manquants) {
@@ -1175,7 +1185,9 @@ window.validerPartiel = async function() {
   const uid = currentUser.uid;
   await update(ref(db, `resultats/${uid}/meta`), { valide: true, validatedAt: Date.now() });
   document.getElementById("rappel-tests").style.display = "none";
-  document.getElementById("succes-overlay").classList.add("open");
+  if (currentRole === "etudiant") {
+    document.getElementById("succes-overlay").classList.add("open");
+  }
 };
 
 window.voirMesResultats = function() {
@@ -1364,11 +1376,18 @@ function renderAdminResultats() {
             <td><strong>${r.meta?.prenom||""} ${r.meta?.nom||""}</strong><br><span style="color:var(--muted);font-size:11px">${r.meta?.email||""}</span></td>
             <td><span class="filiere-tag">${r.meta?.filiere||"—"}</span></td>
             ${TESTS.map(t => `<td>${r.tests?.[t.id] !== undefined ? r.tests[t.id] + " " + t.unite : "—"}</td>`).join("")}
-            <td>${r.meta?.valide ? '<span class="badge-ok">✓ Validé</span>' : '<span class="badge-wait">Attente</span>'}</td>
+            <td>${r.meta?.valide
+              ? `<span class="badge-ok">✓ Validé${r.meta?.validePar === 'admin' ? ' <span style="font-size:10px;opacity:0.7">(admin)</span>' : ''}</span>`
+              : '<span class="badge-wait">⏳ Attente</span>'
+            }</td>
             <td>
               <div class="actions">
-                <button class="btn btn-outline btn-sm" onclick="ouvrirEdit('${uid}')">✏️</button>
-                <button class="btn btn-danger btn-sm" onclick="supprimerResultat('${uid}')">🗑️</button>
+                <button class="btn btn-outline btn-sm" onclick="ouvrirEdit('${uid}')" title="Modifier">✏️</button>
+                ${!r.meta?.valide
+                  ? `<button class="btn btn-sm" style="background:var(--vert);color:white;padding:5px 9px;font-size:12px" onclick="adminValider('${uid}')" title="Valider le bilan">✓</button>`
+                  : `<button class="btn btn-sm" style="background:var(--or-cl);color:var(--orange);border:1px solid var(--orange);padding:5px 9px;font-size:12px" onclick="adminDevalider('${uid}')" title="Annuler la validation">↩</button>`
+                }
+                <button class="btn btn-danger btn-sm" onclick="supprimerEtudiant('${uid}')" title="Supprimer">🗑️</button>
               </div>
             </td>
           </tr>
@@ -1413,10 +1432,53 @@ async function changerRole(uid, newRole) {
   await update(ref(db, `users/${uid}`), { role: newRole });
 }
 
-async function supprimerResultat(uid) {
-  if (!confirm("Supprimer définitivement les résultats de cet étudiant ?")) return;
-  await remove(ref(db, `resultats/${uid}`));
+async function supprimerEtudiant(uid) {
+  // Récupérer le nom pour confirmation
+  const meta = allResultats[uid]?.meta || {};
+  const nom = `${meta.prenom || ""} ${meta.nom || ""}`.trim() || "cet étudiant";
+  if (!confirm(`Supprimer définitivement ${nom} et tous ses résultats ?
+
+Cette action est irréversible.`)) return;
+
+  try {
+    // Supprimer résultats + profil dans Realtime Database
+    await remove(ref(db, `resultats/${uid}`));
+    await remove(ref(db, `users/${uid}`));
+    // Note : le compte Firebase Auth ne peut pas être supprimé depuis le client
+    // Il faudra le supprimer manuellement dans Firebase Console > Authentication si besoin
+  } catch(e) {
+    alert("Erreur lors de la suppression : " + e.message);
+  }
 }
+
+window.supprimerEtudiant = supprimerEtudiant;
+
+async function adminValider(uid) {
+  const meta = allResultats[uid]?.meta || {};
+  const tests = allResultats[uid]?.tests || {};
+  const nbTests = Object.keys(tests).length;
+  const nom = `${meta.prenom || ""} ${meta.nom || ""}`.trim() || "cet étudiant";
+
+  if (nbTests === 0) {
+    alert(`${nom} n'a saisi aucun résultat. Veuillez d'abord saisir ses résultats via le bouton ✏️`);
+    return;
+  }
+  if (nbTests < 5) {
+    if (!confirm(`${nom} n'a saisi que ${nbTests}/5 tests. Valider quand même ?`)) return;
+  }
+  await update(ref(db, `resultats/${uid}/meta`), { valide: true, validatedAt: Date.now(), validePar: "admin" });
+}
+
+window.adminValider = adminValider;
+
+async function adminDevalider(uid) {
+  const meta = allResultats[uid]?.meta || {};
+  const nom = `${meta.prenom || ""} ${meta.nom || ""}`.trim() || "cet étudiant";
+  if (!confirm(`Annuler la validation de ${nom} ? L'étudiant pourra modifier ses résultats.`)) return;
+  await update(ref(db, `resultats/${uid}/meta`), { valide: false, validatedAt: null, validePar: null });
+}
+
+window.adminDevalider = adminDevalider;
 
 function ouvrirEdit(uid) {
   editUID = uid;
