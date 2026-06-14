@@ -1232,12 +1232,16 @@ function initProf() {
 }
 
 function renderProfStats() {
-  const total   = Object.keys(allResultats).length;
-  const valides = Object.values(allResultats).filter(r => r.meta && r.meta.valide).length;
+  const etudiants   = Object.values(allResultats).filter(r => r.meta?.filiere && r.meta.filiere !== "");
+  const total       = etudiants.length;
+  const valides     = etudiants.filter(r => r.meta?.valide === true).length;
+  const enCours     = etudiants.filter(r => r.tests && Object.keys(r.tests).length > 0 && !r.meta?.valide).length;
+  const pasCommence = etudiants.filter(r => !r.tests || Object.keys(r.tests).length === 0).length;
   document.getElementById("prof-stats").innerHTML = `
-    <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-label">Étudiants</div></div>
-    <div class="stat-card"><div class="stat-val">${valides}</div><div class="stat-label">Validés</div></div>
-    <div class="stat-card"><div class="stat-val">${total - valides}</div><div class="stat-label">En attente</div></div>
+    <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-label">Étudiants L1</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--vert)"><div class="stat-val" style="color:var(--vert)">${valides}</div><div class="stat-label">✓ Bilan validé</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--orange)"><div class="stat-val" style="color:var(--orange)">${enCours}</div><div class="stat-label">⏳ En cours</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--gris2)"><div class="stat-val" style="color:var(--muted)">${pasCommence}</div><div class="stat-label">○ Pas commencé</div></div>
   `;
 }
 
@@ -1250,6 +1254,7 @@ function renderProfEtudiants() {
 
   let rows = Object.entries(allResultats).filter(([uid, r]) => {
     if (!r.meta) return false;
+    if (!r.meta.filiere || r.meta.filiere === "") return false; // exclure profs/admin
     if (filtre && r.meta.filiere !== filtre) return false;
     return true;
   });
@@ -1290,13 +1295,21 @@ function initAdmin() {
 }
 
 function renderAdminStats() {
-  const total   = Object.keys(allResultats).length;
-  const valides = Object.values(allResultats).filter(r => r.meta && r.meta.valide).length;
-  const filieres = new Set(Object.values(allResultats).map(r => r.meta?.filiere).filter(Boolean));
+  // Ne compter que les vrais étudiants (filière renseignée = L1)
+  const tousResultats = Object.values(allResultats);
+  const etudiants  = tousResultats.filter(r => r.meta?.filiere && r.meta.filiere !== "");
+  const total      = etudiants.length;
+  const avecTests  = etudiants.filter(r => r.tests && Object.keys(r.tests).length > 0);
+  const valides    = etudiants.filter(r => r.meta?.valide === true);
+  const enCours    = avecTests.filter(r => !r.meta?.valide);
+  const pasCommence= etudiants.filter(r => !r.tests || Object.keys(r.tests).length === 0);
+  const filieres   = new Set(etudiants.map(r => r.meta?.filiere).filter(Boolean));
+
   document.getElementById("admin-stats").innerHTML = `
-    <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-label">Étudiants</div></div>
-    <div class="stat-card"><div class="stat-val">${valides}</div><div class="stat-label">Validés</div></div>
-    <div class="stat-card"><div class="stat-val">${total - valides}</div><div class="stat-label">En attente</div></div>
+    <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-label">Étudiants L1</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--vert)"><div class="stat-val" style="color:var(--vert)">${valides.length}</div><div class="stat-label">✓ Bilan validé</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--orange)"><div class="stat-val" style="color:var(--orange)">${enCours.length}</div><div class="stat-label">⏳ Saisie en cours</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--gris2)"><div class="stat-val" style="color:var(--muted)">${pasCommence.length}</div><div class="stat-label">○ Pas commencé</div></div>
     <div class="stat-card"><div class="stat-val">${filieres.size}</div><div class="stat-label">Filières</div></div>
   `;
 }
@@ -1329,11 +1342,12 @@ function renderAdminResultats() {
 
   let rows = Object.entries(allResultats).filter(([, r]) => {
     if (!r.meta) return false;
+    if (!r.meta.filiere || r.meta.filiere === "") return false; // exclure profs/admin
     if (filtre && r.meta.filiere !== filtre) return false;
     return true;
   });
 
-  if (!rows.length) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun résultat.</p>"; return; }
+  if (!rows.length) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun résultat étudiant.</p>"; return; }
 
   container.innerHTML = `
     <table class="admin-table">
