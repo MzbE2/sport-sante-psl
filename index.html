@@ -263,22 +263,33 @@
   }
 
   /* ===== TEST SAISIE ===== */
+  #tests-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 4px;
+  }
   .test-item {
     background: var(--gris);
-    border-radius: 8px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
-    border-left: 3px solid var(--bleu);
+    border-radius: 12px;
+    padding: 16px;
+    border-top: 4px solid var(--bleu);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.06);
+    display: flex;
+    flex-direction: column;
   }
   .test-item .test-nom {
-    font-weight: 600;
-    font-size: 14px;
+    font-weight: 700;
+    font-size: 15px;
+    line-height: 1.25;
     margin-bottom: 6px;
+    color: var(--bleu);
   }
   .test-item .test-desc {
     font-size: 12px;
     color: var(--muted);
-    margin-bottom: 10px;
+    margin-bottom: 12px;
+    flex: 1;
   }
   .test-input-row {
     display: flex;
@@ -690,6 +701,7 @@
     <button class="tab active" onclick="showTab('tab-admin-dashboard', this)">Dashboard</button>
     <button class="tab" onclick="showTab('tab-admin-resultats', this)">Résultats</button>
     <button class="tab" onclick="showTab('tab-admin-users', this)">Utilisateurs</button>
+    <button class="tab" onclick="showTab('tab-admin-tests', this)">Tests</button>
   </div>
 
   <!-- Dashboard -->
@@ -727,6 +739,18 @@
     <div class="card" style="overflow-x:auto">
       <h3>👤 Gestion des utilisateurs</h3>
       <div id="admin-users-container"><div class="loading">Chargement…</div></div>
+    </div>
+  </div>
+
+  <!-- Tests -->
+  <div id="tab-admin-tests" class="content" style="display:none">
+    <div class="card" style="overflow-x:auto">
+      <h3>🧪 Gestion des tests du bilan</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
+        Modifiez, supprimez ou ajoutez des tests. Les changements s'appliquent à tous les étudiants
+        à leur prochaine connexion. Supprimer un test masque simplement ses anciennes valeurs (elles ne sont pas effacées).
+      </p>
+      <div id="admin-tests-container"><div class="loading">Chargement…</div></div>
     </div>
   </div>
 </div>
@@ -848,14 +872,52 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getDatabase(app);
 
-// ── Définition des 5 tests ───────────────────────────────────
-const TESTS = [
+// ── Tests par défaut (servent de modèle au premier lancement) ──
+const DEFAULT_TESTS = [
   { id: "t1", nom: "Test de marche 6 minutes", desc: "Distance parcourue en marchant rapidement pendant 6 min", unite: "m",   placeholder: "ex : 580" },
   { id: "t2", nom: "Souplesse (sit and reach)",  desc: "Distance atteinte en flexion du tronc, jambes tendues",  unite: "cm",  placeholder: "ex : 12" },
   { id: "t3", nom: "Force de préhension",         desc: "Force maximale mesurée au dynamomètre, meilleure main",  unite: "kg",  placeholder: "ex : 38" },
   { id: "t4", nom: "Équilibre unipodal",          desc: "Durée de maintien sur un pied, yeux fermés",            unite: "sec", placeholder: "ex : 25" },
   { id: "t5", nom: "Indice de masse corporelle",  desc: "IMC calculé ou mesuré sur place",                       unite: "kg/m²",placeholder: "ex : 22.5" },
 ];
+
+// Liste « vivante » des tests, alimentée depuis la base (modifiable par l'admin).
+// Tant que la base n'a rien, on retombe sur DEFAULT_TESTS.
+let TESTS = DEFAULT_TESTS.slice();
+
+// Petits utilitaires
+function esc(s){ return String(s ?? "").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function val(id){ const el = document.getElementById(id); return el ? el.value : ""; }
+
+// Charge les tests depuis /tests. En cas d'absence ou d'erreur (droits/offline),
+// on garde les tests par défaut pour que l'app reste utilisable.
+async function chargerTests() {
+  try {
+    const snap = await get(ref(db, "tests"));
+    if (snap.exists()) {
+      const obj = snap.val();
+      TESTS = Object.entries(obj).map(([id, t]) => ({
+        id,
+        nom: t.nom || id,
+        desc: t.desc || "",
+        unite: t.unite || "",
+        placeholder: t.placeholder || "ex : …",
+        ordre: t.ordre ?? 99
+      })).sort((a, b) => (a.ordre - b.ordre) || a.id.localeCompare(b.id));
+    } else {
+      TESTS = DEFAULT_TESTS.slice();
+    }
+  } catch (e) {
+    TESTS = DEFAULT_TESTS.slice();
+  }
+}
+
+// Génère un identifiant de test unique (t1, t2, … sans collision).
+function genTestId() {
+  let max = 0;
+  TESTS.forEach(t => { const m = /^t(\d+)$/.exec(t.id); if (m) max = Math.max(max, parseInt(m[1], 10)); });
+  return "t" + (max + 1);
+}
 
 // ── Variables globales (exposées sur window pour les handlers inline) ──
 let currentUser = null;
@@ -1089,7 +1151,8 @@ async function logout() {
 }
 
 // ── ÉTUDIANT ─────────────────────────────────────────────────
-function initEtudiant(uid, userData) {
+async function initEtudiant(uid, userData) {
+  await chargerTests();
   renderTests(uid);
   chargerMesResultats(uid);
 }
@@ -1244,7 +1307,8 @@ function chargerMesResultats(uid) {
 }
 
 // ── PROF ─────────────────────────────────────────────────────
-function initProf() {
+async function initProf() {
+  await chargerTests();
   onValue(ref(db, "resultats"), snap => {
     allResultats = snap.exists() ? snap.val() : {};
     renderProfEtudiants();
@@ -1306,7 +1370,23 @@ function renderProfEtudiants() {
 }
 
 // ── ADMIN ─────────────────────────────────────────────────────
-function initAdmin() {
+async function initAdmin() {
+  await chargerTests();
+  // Au tout premier lancement, /tests est vide : on l'initialise avec les
+  // tests par défaut pour que l'admin parte d'une base modifiable.
+  try {
+    const snap = await get(ref(db, "tests"));
+    if (!snap.exists()) {
+      const seed = {};
+      DEFAULT_TESTS.forEach((t, i) => {
+        seed[t.id] = { nom: t.nom, desc: t.desc, unite: t.unite, placeholder: t.placeholder, ordre: i + 1 };
+      });
+      await set(ref(db, "tests"), seed);
+      await chargerTests();
+    }
+  } catch (e) { /* droits insuffisants : on continue avec les défauts */ }
+
+  renderAdminTests();
   onValue(ref(db, "resultats"), snap => {
     allResultats = snap.exists() ? snap.val() : {};
     renderAdminStats();
@@ -1453,6 +1533,95 @@ function renderAdminUsers() {
   `;
 }
 
+// ── Gestion des tests (admin) ─────────────────────────────────
+function renderAdminTests() {
+  const c = document.getElementById("admin-tests-container");
+  if (!c) return;
+  const champ = "margin:0;padding:6px 8px;font-size:13px;width:100%;box-sizing:border-box";
+  c.innerHTML = `
+    <table class="admin-table">
+      <thead><tr>
+        <th>Code</th><th>Titre</th><th>Description</th><th>Unité</th><th>Exemple</th><th>Actions</th>
+      </tr></thead>
+      <tbody>
+        ${TESTS.map(t => `
+          <tr>
+            <td><strong>${esc(t.id.toUpperCase())}</strong></td>
+            <td style="white-space:normal;min-width:140px"><input id="et-nom-${t.id}"   value="${esc(t.nom)}"         style="${champ}"></td>
+            <td style="white-space:normal;min-width:180px"><input id="et-desc-${t.id}"  value="${esc(t.desc)}"        style="${champ}"></td>
+            <td><input id="et-unite-${t.id}" value="${esc(t.unite)}" style="${champ};width:70px"></td>
+            <td><input id="et-ph-${t.id}"    value="${esc(t.placeholder)}" style="${champ};width:90px"></td>
+            <td>
+              <div class="actions">
+                <button class="btn btn-sm" style="background:var(--vert);color:white;padding:5px 9px;font-size:12px" onclick="adminModifierTest('${t.id}')" title="Enregistrer les modifications">💾</button>
+                <button class="btn btn-danger btn-sm" onclick="adminSupprimerTest('${t.id}')" title="Supprimer ce test">🗑️</button>
+              </div>
+            </td>
+          </tr>`).join("")}
+      </tbody>
+    </table>
+
+    <div class="card" style="margin-top:16px;background:var(--gris);border-left:3px solid var(--vert)">
+      <h4 style="margin-bottom:12px">➕ Ajouter un test</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">
+        <div><label style="font-size:12px;font-weight:600">Titre *</label><input id="new-nom"   placeholder="ex : Test de Ruffier" style="margin:4px 0 0;padding:8px"></div>
+        <div><label style="font-size:12px;font-weight:600">Description</label><input id="new-desc" placeholder="ex : Récupération cardiaque" style="margin:4px 0 0;padding:8px"></div>
+        <div><label style="font-size:12px;font-weight:600">Unité</label><input id="new-unite"   placeholder="ex : bpm" style="margin:4px 0 0;padding:8px"></div>
+        <div><label style="font-size:12px;font-weight:600">Exemple</label><input id="new-ph"     placeholder="ex : 12" style="margin:4px 0 0;padding:8px"></div>
+      </div>
+      <button class="btn btn-primary" style="width:auto;padding:9px 18px" onclick="adminAjouterTest()">Ajouter le test</button>
+    </div>
+  `;
+}
+
+async function rafraichirApresTest() {
+  await chargerTests();
+  renderAdminTests();
+  renderAdminResultats();
+}
+
+window.adminModifierTest = async function(id) {
+  const nom = val("et-nom-" + id).trim();
+  if (!nom) { alert("Le titre du test est obligatoire."); return; }
+  const t = TESTS.find(x => x.id === id) || {};
+  try {
+    await update(ref(db, `tests/${id}`), {
+      nom,
+      desc: val("et-desc-" + id).trim(),
+      unite: val("et-unite-" + id).trim(),
+      placeholder: val("et-ph-" + id).trim() || "ex : …",
+      ordre: t.ordre ?? 99
+    });
+    await rafraichirApresTest();
+  } catch (e) { alert("Erreur : " + e.message); }
+};
+
+window.adminSupprimerTest = async function(id) {
+  const t = TESTS.find(x => x.id === id);
+  if (TESTS.length <= 1) { alert("Vous devez conserver au moins un test."); return; }
+  if (!confirm(`Supprimer le test « ${t?.nom || id} » ?\n\nLes valeurs déjà saisies par les étudiants ne seront plus affichées (elles restent stockées).`)) return;
+  try {
+    await remove(ref(db, `tests/${id}`));
+    await rafraichirApresTest();
+  } catch (e) { alert("Erreur : " + e.message); }
+};
+
+window.adminAjouterTest = async function() {
+  const nom = val("new-nom").trim();
+  if (!nom) { alert("Le titre du test est obligatoire."); return; }
+  const id = genTestId();
+  try {
+    await set(ref(db, `tests/${id}`), {
+      nom,
+      desc: val("new-desc").trim(),
+      unite: val("new-unite").trim(),
+      placeholder: val("new-ph").trim() || "ex : …",
+      ordre: TESTS.length + 1
+    });
+    await rafraichirApresTest();
+  } catch (e) { alert("Erreur : " + e.message); }
+};
+
 async function changerRole(uid, newRole) {
   await update(ref(db, `users/${uid}`), { role: newRole });
 }
@@ -1495,8 +1664,8 @@ async function adminValider(uid) {
     alert(`${nom} n'a saisi aucun résultat. Veuillez d'abord saisir ses résultats via le bouton ✏️`);
     return;
   }
-  if (nbTests < 5) {
-    if (!confirm(`${nom} n'a saisi que ${nbTests}/5 tests. Valider quand même ?`)) return;
+  if (nbTests < TESTS.length) {
+    if (!confirm(`${nom} n'a saisi que ${nbTests}/${TESTS.length} tests. Valider quand même ?`)) return;
   }
   await update(ref(db, `resultats/${uid}/meta`), { valide: true, validatedAt: Date.now(), validePar: "admin" });
 }
