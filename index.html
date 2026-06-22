@@ -1038,25 +1038,11 @@ async function doRegister() {
   btnRegister.disabled = true;
 
   try {
-    // ── Vérification anti-doublon prénom+nom ──────────────────────
-    const usersSnap = await get(ref(db, "users"));
-    if (usersSnap.exists()) {
-      const usersData = usersSnap.val();
-      const doublon = Object.values(usersData).find(u =>
-        u.prenom?.toLowerCase().trim() === prenom.toLowerCase() &&
-        u.nom?.toLowerCase().trim()    === nom.toLowerCase()
-      );
-      if (doublon) {
-        btnRegister.textContent = originalText;
-        btnRegister.disabled = false;
-        showMsg("register-msg",
-          `⚠️ Un compte existe déjà pour ${prenom} ${nom.toUpperCase()} (${doublon.email}). ` +
-          `Si c'est vous, utilisez "Se connecter" ou "Mot de passe oublié".`
-        );
-        return;
-      }
-    }
-
+    // NOTE : plus de lecture de tout le nœud "users" ici.
+    // Elle provoquait "Permission denied" car elle s'exécutait avant
+    // l'authentification (et les règles interdisent de lire la liste
+    // des utilisateurs). L'unicité de l'email est déjà garantie par
+    // Firebase Auth (erreur auth/email-already-in-use, gérée plus bas).
     btnRegister.textContent = "Création en cours…";
 
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
