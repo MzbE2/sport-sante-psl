@@ -538,14 +538,8 @@
       <div class="msg" id="login-msg"></div>
       <div class="form-group">
         <label>Email</label>
-        <div style="display:flex;align-items:stretch;gap:0">
-          <input type="text" id="login-email-prefix" placeholder="prenom.nom"
-            autocomplete="username"
-            style="border-radius:var(--radius) 0 0 var(--radius);border-right:none;flex:1;margin-bottom:0"
-            oninput="document.getElementById('login-email').value=this.value+'@dauphine.psl.eu'">
-          <span style="background:var(--gris);border:1.5px solid var(--gris2);border-left:none;border-radius:0 var(--radius) var(--radius) 0;padding:10px 10px;font-size:13px;color:var(--muted);white-space:nowrap;display:flex;align-items:center">@dauphine.psl.eu</span>
-        </div>
-        <input type="hidden" id="login-email">
+        <input type="email" id="login-email" placeholder="prenom.nom@dauphine.psl.eu"
+          autocomplete="username" style="margin-bottom:0">
       </div>
       <div class="form-group">
         <label>Mot de passe</label>
@@ -568,7 +562,7 @@
     <!-- FORM INSCRIPTION -->
     <div id="form-register" style="display:none">
       <h2>Créer un compte</h2>
-      <p class="sub">Réservé aux emails @dauphine.psl.eu ou @psl.eu</p>
+      <p class="sub">Réservé aux emails @dauphine.psl.eu, @dauphine.eu ou @psl.eu</p>
       <div class="msg" id="register-msg"></div>
       <div class="form-group">
         <label>Prénom</label>
@@ -580,14 +574,8 @@
       </div>
       <div class="form-group">
         <label>Email universitaire</label>
-        <div style="display:flex;align-items:stretch;gap:0">
-          <input type="text" id="reg-email-prefix" placeholder="prenom.nom"
-            autocomplete="username"
-            style="border-radius:var(--radius) 0 0 var(--radius);border-right:none;flex:1;margin-bottom:0"
-            oninput="document.getElementById('reg-email').value=this.value+'@dauphine.psl.eu'">
-          <span style="background:var(--gris);border:1.5px solid var(--gris2);border-left:none;border-radius:0 var(--radius) var(--radius) 0;padding:10px 10px;font-size:13px;color:var(--muted);white-space:nowrap;display:flex;align-items:center">@dauphine.psl.eu</span>
-        </div>
-        <input type="hidden" id="reg-email">
+        <input type="email" id="reg-email" placeholder="prenom.nom@dauphine.psl.eu"
+          autocomplete="username" style="margin-bottom:0">
       </div>
       <div class="form-group">
         <label>Filière (étudiants L1 uniquement)</label>
@@ -886,6 +874,8 @@ const DEFAULT_TESTS = [
 let TESTS = DEFAULT_TESTS.slice();
 
 // Petits utilitaires
+const DOMAINES_AUTORISES = ["@dauphine.psl.eu", "@dauphine.eu", "@psl.eu"];
+function emailUnivOk(email){ return DOMAINES_AUTORISES.some(d => email.endsWith(d)); }
 function esc(s){ return String(s ?? "").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function val(id){ const el = document.getElementById(id); return el ? el.value : ""; }
 
@@ -963,18 +953,21 @@ window.toggleVisu = function(inputId, btn) {
 };
 
 window.motDePasseOublie = async function() {
-  const prefix = document.getElementById('login-email-prefix').value.trim();
-  if (!prefix) {
-    showMsg('reset-msg', 'Saisissez d\'abord votre identifiant (partie avant @dauphine.psl.eu).', 'error');
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  if (!email) {
+    showMsg('reset-msg', 'Saisissez d\'abord votre adresse email dans le champ ci-dessus.', 'error');
     return;
   }
-  const email = prefix + '@dauphine.psl.eu';
+  if (!emailUnivOk(email)) {
+    showMsg('reset-msg', 'Email universitaire requis (@dauphine.psl.eu, @dauphine.eu ou @psl.eu).', 'error');
+    return;
+  }
   try {
     const { sendPasswordResetEmail } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
     await sendPasswordResetEmail(auth, email);
-    showMsg('reset-msg', '✓ Email envoyé à ' + email + ' — vérifiez votre boîte mail.', 'success');
+    showMsg('reset-msg', '✓ Si un compte existe pour ' + email + ', un email de réinitialisation vient d\'être envoyé. Vérifiez votre boîte (et les spams).', 'success');
   } catch(e) {
-    showMsg('reset-msg', 'Adresse introuvable. Vérifiez l\'identifiant saisi.', 'error');
+    showMsg('reset-msg', 'Impossible d\'envoyer l\'email. Vérifiez l\'adresse saisie.', 'error');
   }
 };
 
@@ -1057,11 +1050,11 @@ function showMsg(id, text, type = "error") {
 
 // ── Login ────────────────────────────────────────────────────
 async function doLogin() {
-  const email = document.getElementById("login-email").value.trim();
+  const email = document.getElementById("login-email").value.trim().toLowerCase();
   const pass  = document.getElementById("login-pass").value;
   if (!email || !pass) return showMsg("login-msg", "Veuillez remplir tous les champs.");
-  if (!email.endsWith("@dauphine.psl.eu") && !email.endsWith("@psl.eu"))
-    return showMsg("login-msg", "Seuls les emails @dauphine.psl.eu ou @psl.eu sont autorisés.");
+  if (!emailUnivOk(email))
+    return showMsg("login-msg", "Email universitaire requis (@dauphine.psl.eu, @dauphine.eu ou @psl.eu).");
   const btnLogin = document.querySelector('#form-login .btn-primary');
   const originalLoginText = btnLogin.textContent;
   btnLogin.textContent = "Connexion…";
@@ -1086,8 +1079,8 @@ async function doRegister() {
   const pass    = document.getElementById("reg-pass").value;
 
   if (!prenom || !nom || !email || !pass) return showMsg("register-msg", "Tous les champs sont requis.");
-  if (!email.endsWith("@dauphine.psl.eu") && !email.endsWith("@psl.eu"))
-    return showMsg("register-msg", "Email universitaire requis (@dauphine.psl.eu ou @psl.eu).");
+  if (!emailUnivOk(email))
+    return showMsg("register-msg", "Email universitaire requis (@dauphine.psl.eu, @dauphine.eu ou @psl.eu).");
   if (pass.length < 8) return showMsg("register-msg", "Mot de passe : 8 caractères minimum.");
 
   // Rôle par défaut : etudiant. Les profs seront promus par l'admin.
