@@ -731,10 +731,6 @@
   <!-- Dashboard -->
   <div id="tab-admin-dashboard" class="content">
     <div class="stats-row" id="admin-stats"></div>
-    <div class="card">
-      <h3>⚡ Activité récente</h3>
-      <div id="admin-recent"><div class="loading">Chargement…</div></div>
-    </div>
   </div>
 
   <!-- Résultats -->
@@ -847,8 +843,18 @@
     <div id="cr-encadrants-tags" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px"></div>
     <label style="font-size:13px;font-weight:600">Lieu (optionnel)</label>
     <input type="text" id="cr-lieu" placeholder="ex : Gymnase A" style="margin-bottom:10px">
-    <label style="font-size:13px;font-weight:600">Note (optionnel)</label>
-    <input type="text" id="cr-note" placeholder="ex : groupe Gestion L1" style="margin-bottom:12px">
+    <label style="font-size:13px;font-weight:600">Filière du groupe (optionnel)</label>
+    <select id="cr-filiere" style="margin-bottom:12px">
+      <option value="">— Toutes / non précisée —</option>
+      <option value="Gestion">Gestion</option>
+      <option value="Économie">Économie</option>
+      <option value="Informatique">Informatique (MIAGE)</option>
+      <option value="Mathématiques">Mathématiques</option>
+      <option value="Droit">Droit</option>
+      <option value="Finance">Finance</option>
+      <option value="Commerce">Commerce International</option>
+      <option value="Autre">Autre filière</option>
+    </select>
     <div style="display:flex; gap:10px; margin-top:4px">
       <button class="btn btn-primary" style="flex:1" onclick="saveCreneau()">Enregistrer</button>
       <button class="btn btn-outline" onclick="fermerCreneauModal()">Annuler</button>
@@ -1573,7 +1579,6 @@ async function initAdmin() {
     allResultats = snap.exists() ? snap.val() : {};
     renderAdminStats();
     renderAdminResultats();
-    renderAdminRecent();
     renderHistorique();
   });
   onValue(ref(db, "users"), snap => {
@@ -1605,25 +1610,6 @@ function renderAdminStats() {
     <div class="stat-card" style="border-top:3px solid var(--gris2)"><div class="stat-val" style="color:var(--muted)">${pasCommence.length}</div><div class="stat-label">○ Pas commencé</div></div>
     <div class="stat-card"><div class="stat-val">${filieres.size}</div><div class="stat-label">Filières</div></div>
   `;
-}
-
-function renderAdminRecent() {
-  const container = document.getElementById("admin-recent");
-  const items = Object.entries(allResultats)
-    .filter(([, r]) => r.meta?.validatedAt)
-    .sort(([,a],[,b]) => (b.meta.validatedAt||0) - (a.meta.validatedAt||0))
-    .slice(0, 6);
-  if (!items.length) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucune activité récente.</p>"; return; }
-  container.innerHTML = items.map(([uid, r]) => {
-    const d = new Date(r.meta.validatedAt);
-    return `<div class="student-row">
-      <div>
-        <div class="student-name">${r.meta.prenom || ""} ${r.meta.nom || ""}</div>
-        <div class="student-meta"><span class="filiere-tag">${r.meta.filiere||"—"}</span></div>
-      </div>
-      <span style="font-size:12px;color:var(--muted)">${d.toLocaleDateString("fr-FR")} ${d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</span>
-    </div>`;
-  }).join("");
 }
 
 function adminFiltrerResultats() { renderAdminResultats(); }
@@ -1932,6 +1918,14 @@ function creneauTimestamp(r) {
   return r.meta?.startedAt || r.meta?.validatedAt || null;
 }
 
+// Libellés lisibles des filières (mêmes valeurs qu'à l'inscription)
+const FILIERE_LABELS = {
+  "Gestion": "Gestion", "Économie": "Économie", "Informatique": "Informatique (MIAGE)",
+  "Mathématiques": "Mathématiques", "Droit": "Droit", "Finance": "Finance",
+  "Commerce": "Commerce International", "Autre": "Autre filière"
+};
+function labelFiliere(v) { return FILIERE_LABELS[v] || v || "—"; }
+
 // Étudiants d'un créneau : priorité à l'affectation manuelle (meta.creneauId),
 // sinon rattachement automatique par l'heure de la 1re saisie.
 //   meta.creneauId === id          → forcé dans ce créneau
@@ -2038,7 +2032,7 @@ function ouvrirCreneauModal(id, datePreremplie) {
   document.getElementById("cr-debut").value = c?.debut || "09:00";
   document.getElementById("cr-fin").value   = c?.fin   || "10:30";
   document.getElementById("cr-lieu").value  = c?.lieu  || "";
-  document.getElementById("cr-note").value  = c?.note  || "";
+  document.getElementById("cr-filiere").value = c?.filiere || "";
   crEncadrants = c?.encadrants ? [...c.encadrants] : [];
   rafraichirEncadrantsTags();
   document.getElementById("cr-encadrant-libre").value = "";
@@ -2066,7 +2060,7 @@ async function saveCreneau() {
     date, debut, fin,
     encadrants: crEncadrants,
     lieu: document.getElementById("cr-lieu").value.trim(),
-    note: document.getElementById("cr-note").value.trim(),
+    filiere: document.getElementById("cr-filiere").value,
     createdAt: existe ? (allCreneaux[id]?.createdAt || Date.now()) : Date.now()
   });
   fermerCreneauModal();
@@ -2120,19 +2114,33 @@ function ouvrirCreneauDetail(id) {
       }).join("")
     : "<p style='color:var(--muted);font-size:13px'>Aucun étudiant rattaché (personne n'a commencé son bilan pendant cette plage, et aucun n'a été ajouté manuellement).</p>";
 
-  // Étudiants ajoutables (pas déjà dans ce créneau)
+  // Étudiants ajoutables (pas déjà dans ce créneau), groupés par filière
+  // (filière du créneau en tête) et triés alphabétiquement dans chaque groupe.
   const dejaIds = new Set(etudiants.map(([uid]) => uid));
-  const ajoutables = Object.entries(allResultats)
+  const parFiliere = {};
+  Object.entries(allResultats)
     .filter(([uid, r]) => r.meta && r.meta.filiere && !dejaIds.has(uid))
-    .sort(([, a], [, b]) => `${a.meta.nom || ""}`.localeCompare(`${b.meta.nom || ""}`))
-    .map(([uid, r]) => `<option value="${uid}">${r.meta.prenom || ""} ${r.meta.nom || ""} — ${r.meta.filiere || "—"}</option>`)
-    .join("");
+    .forEach(([uid, r]) => { (parFiliere[r.meta.filiere] = parFiliere[r.meta.filiere] || []).push([uid, r]); });
+  const ajoutables = Object.keys(parFiliere)
+    .sort((a, b) => {
+      if (a === c.filiere) return -1;
+      if (b === c.filiere) return 1;
+      return labelFiliere(a).localeCompare(labelFiliere(b));
+    })
+    .map(fil => {
+      const opts = parFiliere[fil]
+        .sort(([, a], [, b]) =>
+          `${a.meta.nom || ""} ${a.meta.prenom || ""}`.localeCompare(`${b.meta.nom || ""} ${b.meta.prenom || ""}`))
+        .map(([uid, r]) => `<option value="${uid}">${r.meta.prenom || ""} ${r.meta.nom || ""}</option>`)
+        .join("");
+      return `<optgroup label="${labelFiliere(fil)}">${opts}</optgroup>`;
+    }).join("");
 
   document.getElementById("cr-detail-contenu").innerHTML = `
     <h3 style="margin-bottom:6px">📅 ${dateLisible}</h3>
     <p style="font-size:14px;margin-bottom:4px"><strong>${c.debut}–${c.fin}</strong>${c.lieu ? " · " + c.lieu : ""}</p>
     <p style="font-size:13px;color:var(--muted);margin-bottom:4px">👤 ${(c.encadrants || []).join(", ") || "Aucun encadrant"}</p>
-    ${c.note ? `<p style="font-size:13px;color:var(--muted);margin-bottom:10px">📝 ${c.note}</p>` : ""}
+    ${c.filiere ? `<p style="font-size:13px;margin-bottom:10px">🎓 <span class="filiere-tag">${labelFiliere(c.filiere)}</span></p>` : ""}
     <div style="display:flex;gap:8px;margin:10px 0 14px;flex-wrap:wrap">
       <button class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:13px" onclick="fermerCreneauDetail();ouvrirCreneauModal('${id}')">✏️ Modifier</button>
       <button class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:13px" onclick="dupliquerCreneau('${id}')">⧉ Dupliquer</button>
@@ -2175,6 +2183,7 @@ function dupliquerCreneau(id) {
   document.getElementById("cr-debut").value = c.debut || "09:00";
   document.getElementById("cr-fin").value   = c.fin   || "10:30";
   document.getElementById("cr-lieu").value  = c.lieu  || "";
+  document.getElementById("cr-filiere").value = c.filiere || "";
   crEncadrants = c.encadrants ? [...c.encadrants] : [];
   rafraichirEncadrantsTags();
 }
