@@ -346,6 +346,17 @@
   .student-meta { color: var(--muted); font-size: 12px; }
   .badge-ok   { background: var(--vert-cl); color: var(--vert); padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
   .badge-wait { background: var(--or-cl); color: var(--orange); padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-relance { background: var(--rouge-cl); color: var(--rouge); padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-none { background: var(--gris2); color: var(--muted); padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .student-row.attn { background: var(--rouge-cl); border-left: 4px solid var(--rouge); padding-left: 10px; border-radius: 6px; }
+  .reste-tags { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .reste-tag { background: var(--gris); border: 1px solid var(--gris2); color: var(--muted); font-size: 10px; padding: 1px 7px; border-radius: 12px; }
+  /* barre de progression ateliers */
+  .atelier-row { padding: 8px 0; border-bottom: 1px solid var(--gris2); }
+  .atelier-row:last-child { border-bottom: none; }
+  .atelier-head { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
+  .atelier-bar { height: 8px; background: var(--gris2); border-radius: 6px; overflow: hidden; }
+  .atelier-fill { height: 100%; background: var(--bleu); border-radius: 6px; transition: width .3s; }
 
   /* ===== ADMIN TABLE ===== */
   .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto; }
@@ -409,6 +420,28 @@
   }
 
   /* ===== MODAL ===== */
+  /* ===== CALENDRIER HISTORIQUE ===== */
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); padding: 4px 0; text-transform: uppercase; }
+  .cal-cell { min-height: 84px; border: 1px solid var(--gris2); border-radius: 8px; padding: 4px; background: var(--blanc); display: flex; flex-direction: column; gap: 3px; }
+  .cal-cell.vide { background: transparent; border: none; }
+  .cal-cell.today { border-color: var(--bleu); box-shadow: 0 0 0 1px var(--bleu); }
+  .cal-num { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .cal-add { font-size: 11px; color: var(--bleu); cursor: pointer; opacity: 0; transition: opacity .15s; margin-top: auto; }
+  .cal-cell:hover .cal-add { opacity: 1; }
+  .cal-pill { background: var(--bleu-cl); color: var(--bleu); border-radius: 6px; padding: 3px 5px; font-size: 10px; cursor: pointer; line-height: 1.25; border-left: 3px solid var(--bleu); }
+  .cal-pill:hover { filter: brightness(0.96); }
+  .cal-pill .h { font-weight: 700; }
+  .cal-pill .e { display: block; opacity: 0.85; }
+  .cal-pill .n { display: block; font-weight: 700; color: var(--vert); }
+  .enc-tag { background: var(--vert-cl); color: var(--vert); font-size: 12px; font-weight: 600; padding: 3px 8px 3px 10px; border-radius: 14px; display: inline-flex; align-items: center; gap: 6px; }
+  .enc-tag span { cursor: pointer; font-weight: 700; }
+  @media (max-width: 640px) {
+    .cal-cell { min-height: 60px; }
+    .cal-pill { font-size: 9px; }
+    .cal-pill .e { display: none; }
+  }
+
   .modal-bg {
     display: none;
     position: fixed;
@@ -646,17 +679,19 @@
 <!--  PAGE PROF SUAPS                                             -->
 <!-- ============================================================ -->
 <div id="page-prof" class="page">
-  <div class="tabs">
-    <button class="tab active" onclick="showTab('tab-prof-suivi', this)">Suivi en direct</button>
-    <button class="tab" onclick="showTab('tab-prof-session', this)">Session en cours</button>
-  </div>
-
-  <div id="tab-prof-suivi" class="content">
+  <div class="content">
     <div class="stats-row" id="prof-stats"></div>
+
     <div class="card">
-      <h3>👥 Étudiants — résultats en direct</h3>
-      <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap">
-        <select id="filtre-filiere" onchange="filtrerEtudiants()" style="width:auto; margin-bottom:0; flex:1">
+      <h3>🏃 Ateliers — où envoyer les étudiants</h3>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:12px">Nombre d'étudiants ayant déjà fait chaque atelier / restant à le faire. Repérez vite les ateliers les moins demandés.</p>
+      <div id="prof-ateliers"><div class="loading">Chargement…</div></div>
+    </div>
+
+    <div class="card">
+      <h3>👥 Étudiants — suivi en direct</h3>
+      <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+        <select id="filtre-filiere" onchange="filtrerEtudiants()" style="width:auto; margin-bottom:0; flex:1; min-width:160px">
           <option value="">Toutes les filières</option>
           <option value="Gestion">Gestion</option>
           <option value="Économie">Économie</option>
@@ -667,16 +702,16 @@
           <option value="Commerce">Commerce International</option>
           <option value="Autre">Autre filière</option>
         </select>
+        <input id="filtre-nom" type="text" placeholder="🔎 Rechercher un nom…" oninput="filtrerEtudiants()" style="width:auto; margin-bottom:0; flex:1; min-width:160px">
+        <select id="filtre-statut" onchange="filtrerEtudiants()" style="width:auto; margin-bottom:0; flex:1; min-width:160px">
+          <option value="">Tous les statuts</option>
+          <option value="arelancer">⚠ À faire valider</option>
+          <option value="encours">⏳ En cours</option>
+          <option value="pasco">○ Pas commencé</option>
+          <option value="valide">✓ Validé</option>
+        </select>
       </div>
       <div id="prof-etudiants-list"><div class="loading">Chargement…</div></div>
-    </div>
-  </div>
-
-  <div id="tab-prof-session" class="content" style="display:none">
-    <div class="card">
-      <h3>📅 Session en cours</h3>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:14px">Informations sur la session de passation active.</p>
-      <div id="session-info"><div class="loading">Chargement…</div></div>
     </div>
   </div>
 </div>
@@ -688,6 +723,7 @@
   <div class="tabs">
     <button class="tab active" onclick="showTab('tab-admin-dashboard', this)">Dashboard</button>
     <button class="tab" onclick="showTab('tab-admin-resultats', this)">Résultats</button>
+    <button class="tab" onclick="showTab('tab-admin-historique', this)">Historique</button>
     <button class="tab" onclick="showTab('tab-admin-users', this)">Utilisateurs</button>
     <button class="tab" onclick="showTab('tab-admin-tests', this)">Tests</button>
   </div>
@@ -722,6 +758,29 @@
     </div>
   </div>
 
+  <!-- Historique -->
+  <div id="tab-admin-historique" class="content" style="display:none">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px">
+        <h3 style="margin:0">📅 Historique des créneaux</h3>
+        <button class="btn btn-primary" style="width:auto; padding:8px 14px; font-size:13px" onclick="ouvrirCreneauModal()">+ Ajouter un créneau</button>
+      </div>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:14px">
+        Retrouvez quel groupe d'étudiants a été encadré, par qui, quel jour et à quelle heure.
+        Les étudiants sont rattachés automatiquement au créneau pendant lequel ils ont commencé leur bilan.
+      </p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px">
+        <button class="btn btn-outline" style="width:auto; padding:6px 12px" onclick="histChangerMois(-1)">‹</button>
+        <strong id="hist-mois-label" style="min-width:150px; text-align:center"></strong>
+        <button class="btn btn-outline" style="width:auto; padding:6px 12px" onclick="histChangerMois(1)">›</button>
+        <select id="hist-filtre-encadrant" onchange="renderHistorique()" style="width:auto; margin-bottom:0; flex:1; min-width:180px">
+          <option value="">Tous les encadrants</option>
+        </select>
+      </div>
+      <div id="hist-calendrier"><div class="loading">Chargement…</div></div>
+    </div>
+  </div>
+
   <!-- Utilisateurs -->
   <div id="tab-admin-users" class="content" style="display:none">
     <div class="card" style="overflow-x:auto">
@@ -753,6 +812,56 @@
     <div style="display:flex; gap:10px; margin-top:16px">
       <button class="btn btn-primary" style="flex:1" onclick="saveEdit()">Enregistrer</button>
       <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modale créneau (création / édition) -->
+<div class="modal-bg" id="modal-creneau">
+  <div class="modal">
+    <h3 id="modal-creneau-titre">➕ Nouveau créneau</h3>
+    <input type="hidden" id="cr-id">
+    <label style="font-size:13px;font-weight:600">Date</label>
+    <input type="date" id="cr-date" style="margin-bottom:10px">
+    <div style="display:flex; gap:10px">
+      <div style="flex:1">
+        <label style="font-size:13px;font-weight:600">Début</label>
+        <input type="time" id="cr-debut" value="09:00" style="margin-bottom:10px">
+      </div>
+      <div style="flex:1">
+        <label style="font-size:13px;font-weight:600">Fin</label>
+        <input type="time" id="cr-fin" value="10:30" style="margin-bottom:10px">
+      </div>
+    </div>
+    <label style="font-size:13px;font-weight:600">Encadrants</label>
+    <div style="display:flex; gap:8px; margin-bottom:6px">
+      <select id="cr-encadrant-select" style="flex:1; margin-bottom:0">
+        <option value="">— Choisir un prof SUAPS —</option>
+      </select>
+      <button class="btn btn-outline" style="width:auto; padding:8px 12px" onclick="ajouterEncadrantSelect()">+</button>
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:6px">
+      <input type="text" id="cr-encadrant-libre" placeholder="…ou saisir un nom" style="flex:1; margin-bottom:0">
+      <button class="btn btn-outline" style="width:auto; padding:8px 12px" onclick="ajouterEncadrantLibre()">+</button>
+    </div>
+    <div id="cr-encadrants-tags" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px"></div>
+    <label style="font-size:13px;font-weight:600">Lieu (optionnel)</label>
+    <input type="text" id="cr-lieu" placeholder="ex : Gymnase A" style="margin-bottom:10px">
+    <label style="font-size:13px;font-weight:600">Note (optionnel)</label>
+    <input type="text" id="cr-note" placeholder="ex : groupe Gestion L1" style="margin-bottom:12px">
+    <div style="display:flex; gap:10px; margin-top:4px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveCreneau()">Enregistrer</button>
+      <button class="btn btn-outline" onclick="fermerCreneauModal()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modale détail d'un créneau -->
+<div class="modal-bg" id="modal-creneau-detail">
+  <div class="modal">
+    <div id="cr-detail-contenu"></div>
+    <div style="display:flex; gap:10px; margin-top:16px">
+      <button class="btn btn-outline" style="flex:1" onclick="fermerCreneauDetail()">Fermer</button>
     </div>
   </div>
 </div>
@@ -915,6 +1024,10 @@ let currentRole = null;
 let allResultats = {};
 let allUsers    = {};
 let editUID     = null;
+let allCreneaux = {};
+let crEncadrants = [];                 // encadrants en cours d'édition dans la modale
+const HIST_DEFAUT = "2026-09";          // mois affiché par défaut (septembre 2026)
+let histMois = HIST_DEFAUT;             // format "AAAA-MM"
 const ADMIN_EMAIL = "admin@dauphine.psl.eu"; // ← à adapter
 
 function updateUserBar(data) {
@@ -1183,6 +1296,12 @@ function renderTests(uid) {
 window.sauvegarderTest = async function(uid, testId, valeur) {
   if (valeur === "") return;
   await set(ref(db, `resultats/${uid}/tests/${testId}`), parseFloat(valeur));
+  // Horodatage de la 1re saisie : sert à rattacher automatiquement
+  // l'étudiant au créneau pendant lequel il a démarré son bilan.
+  const startSnap = await get(ref(db, `resultats/${uid}/meta/startedAt`));
+  if (!startSnap.exists()) {
+    await update(ref(db, `resultats/${uid}/meta`), { startedAt: Date.now() });
+  }
   const el = document.getElementById(`saved-${testId}`);
   if (el) { el.style.display = "block"; setTimeout(() => el.style.display = "none", 2000); }
 };
@@ -1304,8 +1423,9 @@ async function initProf() {
   await chargerTests();
   onValue(ref(db, "resultats"), snap => {
     allResultats = snap.exists() ? snap.val() : {};
-    renderProfEtudiants();
     renderProfStats();
+    renderProfAteliers();
+    renderProfEtudiants();
   });
   onValue(ref(db, "users"), snap => {
     allUsers = snap.exists() ? snap.val() : {};
@@ -1313,50 +1433,118 @@ async function initProf() {
   });
 }
 
+// Statut d'un étudiant : "pasco" | "encours" | "arelancer" | "valide"
+function statutEtudiant(r) {
+  const nbTests = r.tests ? Object.keys(r.tests).length : 0;
+  if (r.meta?.valide === true) return "valide";
+  if (nbTests === 0)            return "pasco";
+  if (nbTests >= TESTS.length)  return "arelancer"; // tout fait mais session non fermée
+  return "encours";
+}
+
+function profEtudiants() {
+  return Object.entries(allResultats).filter(([, r]) =>
+    r.meta && r.meta.filiere && r.meta.filiere !== ""   // exclure profs/admin
+  );
+}
+
 function renderProfStats() {
-  const etudiants   = Object.values(allResultats).filter(r => r.meta?.filiere && r.meta.filiere !== "");
-  const total       = etudiants.length;
-  const valides     = etudiants.filter(r => r.meta?.valide === true).length;
-  const enCours     = etudiants.filter(r => r.tests && Object.keys(r.tests).length > 0 && !r.meta?.valide).length;
-  const pasCommence = etudiants.filter(r => !r.tests || Object.keys(r.tests).length === 0).length;
+  const liste = profEtudiants().map(([, r]) => r);
+  const total       = liste.length;
+  const valides     = liste.filter(r => statutEtudiant(r) === "valide").length;
+  const arelancer   = liste.filter(r => statutEtudiant(r) === "arelancer").length;
+  const enCours     = liste.filter(r => statutEtudiant(r) === "encours").length;
+  const pasCommence = liste.filter(r => statutEtudiant(r) === "pasco").length;
   document.getElementById("prof-stats").innerHTML = `
-    <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-label">Étudiants L1</div></div>
-    <div class="stat-card" style="border-top:3px solid var(--vert)"><div class="stat-val" style="color:var(--vert)">${valides}</div><div class="stat-label">✓ Bilan validé</div></div>
-    <div class="stat-card" style="border-top:3px solid var(--orange)"><div class="stat-val" style="color:var(--orange)">${enCours}</div><div class="stat-label">⏳ En cours</div></div>
+    <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-label">Étudiants</div></div>
     <div class="stat-card" style="border-top:3px solid var(--gris2)"><div class="stat-val" style="color:var(--muted)">${pasCommence}</div><div class="stat-label">○ Pas commencé</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--orange)"><div class="stat-val" style="color:var(--orange)">${enCours}</div><div class="stat-label">⏳ En cours</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--rouge)"><div class="stat-val" style="color:var(--rouge)">${arelancer}</div><div class="stat-label">⚠ À faire valider</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--vert)"><div class="stat-val" style="color:var(--vert)">${valides}</div><div class="stat-label">✓ Validé</div></div>
   `;
+}
+
+function renderProfAteliers() {
+  const container = document.getElementById("prof-ateliers");
+  if (!container) return;
+  const liste = profEtudiants().map(([, r]) => r);
+  const total = liste.length;
+  if (total === 0) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun étudiant.</p>"; return; }
+
+  container.innerHTML = TESTS.map(t => {
+    const faits = liste.filter(r => r.tests && r.tests[t.id]).length;
+    const reste = total - faits;
+    const pct   = total ? Math.round(faits / total * 100) : 0;
+    return `
+      <div class="atelier-row">
+        <div class="atelier-head">
+          <span><strong>${t.nom}</strong></span>
+          <span style="color:var(--muted)">fait ${faits} · <span style="color:var(--rouge)">reste ${reste}</span></span>
+        </div>
+        <div class="atelier-bar"><div class="atelier-fill" style="width:${pct}%"></div></div>
+      </div>`;
+  }).join("");
 }
 
 function filtrerEtudiants() { renderProfEtudiants(); }
 
 function renderProfEtudiants() {
-  const filtre = document.getElementById("filtre-filiere")?.value || "";
+  const filtreFil = document.getElementById("filtre-filiere")?.value || "";
+  const filtreNom = (document.getElementById("filtre-nom")?.value || "").toLowerCase().trim();
+  const filtreSt  = document.getElementById("filtre-statut")?.value || "";
   const container = document.getElementById("prof-etudiants-list");
   if (!container) return;
 
-  let rows = Object.entries(allResultats).filter(([uid, r]) => {
-    if (!r.meta) return false;
-    if (!r.meta.filiere || r.meta.filiere === "") return false; // exclure profs/admin
-    if (filtre && r.meta.filiere !== filtre) return false;
+  let rows = profEtudiants().filter(([, r]) => {
+    if (filtreFil && r.meta.filiere !== filtreFil) return false;
+    if (filtreSt  && statutEtudiant(r) !== filtreSt) return false;
+    if (filtreNom) {
+      const nomComplet = `${r.meta.prenom || ""} ${r.meta.nom || ""}`.toLowerCase();
+      if (!nomComplet.includes(filtreNom)) return false;
+    }
     return true;
   });
 
   if (rows.length === 0) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun résultat.</p>"; return; }
 
+  // Tri par priorité : à relancer d'abord, puis en cours, pas commencé, validé
+  const ordre = { arelancer: 0, encours: 1, pasco: 2, valide: 3 };
+  rows.sort(([, a], [, b]) => {
+    const da = ordre[statutEtudiant(a)], db_ = ordre[statutEtudiant(b)];
+    if (da !== db_) return da - db_;
+    return `${a.meta.nom||""}`.localeCompare(`${b.meta.nom||""}`);
+  });
+
   container.innerHTML = rows.map(([uid, r]) => {
-    const meta   = r.meta || {};
-    const tests  = r.tests || {};
+    const meta    = r.meta || {};
+    const tests   = r.tests || {};
     const nbTests = Object.keys(tests).length;
+    const st      = statutEtudiant(r);
+
+    // Ateliers restants (pour guider l'étudiant)
+    const restants = TESTS.filter(t => !tests[t.id]).map(t => t.nom);
+    let resteHTML = "";
+    if (st === "encours" && restants.length) {
+      resteHTML = `<div class="reste-tags">À faire : ${restants.map(n => `<span class="reste-tag">${n}</span>`).join("")}</div>`;
+    }
+
+    let badge;
+    if (st === "valide")         badge = '<span class="badge-ok">✓ Validé</span>';
+    else if (st === "arelancer") badge = '<span class="badge-relance">⚠ À faire valider</span>';
+    else if (st === "encours")   badge = '<span class="badge-wait">⏳ En cours</span>';
+    else                         badge = '<span class="badge-none">○ Pas commencé</span>';
+
     return `
-      <div class="student-row">
+      <div class="student-row ${st === "arelancer" ? "attn" : ""}">
         <div>
           <div class="student-name">${meta.prenom || ""} ${meta.nom || ""}</div>
           <div class="student-meta">
             <span class="filiere-tag">${meta.filiere || "—"}</span>
-            &nbsp;${nbTests}/${TESTS.length} tests
+            &nbsp;${nbTests}/${TESTS.length} ateliers
           </div>
+          ${resteHTML}
         </div>
-        ${meta.valide ? '<span class="badge-ok">✓ Validé</span>' : '<span class="badge-wait">En cours</span>'}
+        ${badge}
       </div>
     `;
   }).join("");
@@ -1389,6 +1577,11 @@ async function initAdmin() {
   onValue(ref(db, "users"), snap => {
     allUsers = snap.exists() ? snap.val() : {};
     renderAdminUsers();
+    remplirEncadrantsSelect();
+  });
+  onValue(ref(db, "creneaux"), snap => {
+    allCreneaux = snap.exists() ? snap.val() : {};
+    renderHistorique();
   });
 }
 
@@ -1702,6 +1895,220 @@ function closeModal() {
   document.getElementById("modal-edit").classList.remove("open");
   editUID = null;
 }
+
+// ── HISTORIQUE / CRÉNEAUX (Admin) ────────────────────────────
+
+// Encadrants candidats = comptes "Prof SUAPS"
+function profsSuaps() {
+  return Object.values(allUsers)
+    .filter(u => u.role === "prof")
+    .map(u => `${u.prenom || ""} ${(u.nom || "").toUpperCase()}`.trim())
+    .filter(Boolean)
+    .sort();
+}
+
+function remplirEncadrantsSelect() {
+  const sel = document.getElementById("cr-encadrant-select");
+  if (sel) {
+    sel.innerHTML = '<option value="">— Choisir un prof SUAPS —</option>' +
+      profsSuaps().map(p => `<option value="${p}">${p}</option>`).join("");
+  }
+  const filtre = document.getElementById("hist-filtre-encadrant");
+  if (filtre) {
+    const noms = new Set();
+    Object.values(allCreneaux).forEach(c => (c.encadrants || []).forEach(e => noms.add(e)));
+    profsSuaps().forEach(p => noms.add(p));
+    const cur = filtre.value;
+    filtre.innerHTML = '<option value="">Tous les encadrants</option>' +
+      [...noms].sort().map(n => `<option value="${n}">${n}</option>`).join("");
+    filtre.value = cur;
+  }
+}
+
+// Timestamp de rattachement = 1re saisie (à défaut : validation)
+function creneauTimestamp(r) {
+  return r.meta?.startedAt || r.meta?.validatedAt || null;
+}
+
+// Étudiants dont la 1re saisie tombe dans la plage horaire du créneau
+function creneauEtudiants(c) {
+  const debut = new Date(`${c.date}T${c.debut || "00:00"}`).getTime();
+  const fin   = new Date(`${c.date}T${c.fin   || "23:59"}`).getTime();
+  return Object.entries(allResultats)
+    .filter(([, r]) => r.meta && r.meta.filiere)
+    .filter(([, r]) => { const ts = creneauTimestamp(r); return ts && ts >= debut && ts <= fin; })
+    .sort(([, a], [, b]) => `${a.meta.nom || ""}`.localeCompare(`${b.meta.nom || ""}`));
+}
+
+function histChangerMois(delta) {
+  const [y, m] = histMois.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  histMois = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  renderHistorique();
+}
+window.histChangerMois = histChangerMois;
+
+function renderHistorique() {
+  remplirEncadrantsSelect();
+  const cont = document.getElementById("hist-calendrier");
+  if (!cont) return;
+  const filtreEnc = document.getElementById("hist-filtre-encadrant")?.value || "";
+  const [y, m] = histMois.split("-").map(Number);
+  const moisNoms = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+  const label = document.getElementById("hist-mois-label");
+  if (label) label.textContent = `${moisNoms[m - 1]} ${y}`;
+
+  const parJour = {};
+  Object.entries(allCreneaux).forEach(([id, c]) => {
+    if (!c.date || !c.date.startsWith(histMois)) return;
+    if (filtreEnc && !(c.encadrants || []).includes(filtreEnc)) return;
+    (parJour[c.date] = parJour[c.date] || []).push({ id, ...c });
+  });
+  Object.values(parJour).forEach(arr => arr.sort((a, b) => (a.debut || "").localeCompare(b.debut || "")));
+
+  const premier = new Date(y, m - 1, 1);
+  let decalage = premier.getDay() - 1; if (decalage < 0) decalage = 6;
+  const nbJours = new Date(y, m, 0).getDate();
+  const aujISO = new Date().toISOString().slice(0, 10);
+  const dows = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+
+  let html = '<div class="cal-grid">' + dows.map(d => `<div class="cal-dow">${d}</div>`).join("");
+  for (let i = 0; i < decalage; i++) html += '<div class="cal-cell vide"></div>';
+  for (let jour = 1; jour <= nbJours; jour++) {
+    const dateISO = `${histMois}-${String(jour).padStart(2, "0")}`;
+    const pills = (parJour[dateISO] || []).map(c => {
+      const nb = creneauEtudiants(c).length;
+      const encs = (c.encadrants || []).join(", ") || "—";
+      return `<div class="cal-pill" onclick="ouvrirCreneauDetail('${c.id}')">
+        <span class="h">${c.debut || ""}–${c.fin || ""}</span>
+        <span class="e">${encs}</span>
+        ${nb ? `<span class="n">${nb} étud.</span>` : ""}
+      </div>`;
+    }).join("");
+    html += `<div class="cal-cell ${dateISO === aujISO ? "today" : ""}">
+      <div class="cal-num">${jour}</div>${pills}
+      <div class="cal-add" onclick="ouvrirCreneauModal(null,'${dateISO}')">+ créneau</div>
+    </div>`;
+  }
+  html += "</div>";
+  cont.innerHTML = html;
+}
+window.renderHistorique = renderHistorique;
+
+// ----- Modale création / édition -----
+function rafraichirEncadrantsTags() {
+  const box = document.getElementById("cr-encadrants-tags");
+  if (box) box.innerHTML = crEncadrants.map((e, i) =>
+    `<span class="enc-tag">${e}<span onclick="retirerEncadrant(${i})">✕</span></span>`).join("");
+}
+function ajouterEncadrantSelect() {
+  const sel = document.getElementById("cr-encadrant-select");
+  if (sel.value && !crEncadrants.includes(sel.value)) { crEncadrants.push(sel.value); rafraichirEncadrantsTags(); }
+  sel.value = "";
+}
+function ajouterEncadrantLibre() {
+  const inp = document.getElementById("cr-encadrant-libre");
+  const v = inp.value.trim();
+  if (v && !crEncadrants.includes(v)) { crEncadrants.push(v); rafraichirEncadrantsTags(); }
+  inp.value = "";
+}
+function retirerEncadrant(i) { crEncadrants.splice(i, 1); rafraichirEncadrantsTags(); }
+window.ajouterEncadrantSelect = ajouterEncadrantSelect;
+window.ajouterEncadrantLibre  = ajouterEncadrantLibre;
+window.retirerEncadrant       = retirerEncadrant;
+
+function ouvrirCreneauModal(id, datePreremplie) {
+  remplirEncadrantsSelect();
+  const c = id ? allCreneaux[id] : null;
+  document.getElementById("modal-creneau-titre").textContent = id ? "✏️ Modifier le créneau" : "➕ Nouveau créneau";
+  document.getElementById("cr-id").value    = id || "";
+  document.getElementById("cr-date").value  = c?.date  || datePreremplie || (histMois + "-01");
+  document.getElementById("cr-debut").value = c?.debut || "09:00";
+  document.getElementById("cr-fin").value   = c?.fin   || "10:30";
+  document.getElementById("cr-lieu").value  = c?.lieu  || "";
+  document.getElementById("cr-note").value  = c?.note  || "";
+  crEncadrants = c?.encadrants ? [...c.encadrants] : [];
+  rafraichirEncadrantsTags();
+  document.getElementById("cr-encadrant-libre").value = "";
+  document.getElementById("modal-creneau").classList.add("open");
+}
+window.ouvrirCreneauModal = ouvrirCreneauModal;
+
+function fermerCreneauModal() { document.getElementById("modal-creneau").classList.remove("open"); }
+window.fermerCreneauModal = fermerCreneauModal;
+
+async function saveCreneau() {
+  const date  = document.getElementById("cr-date").value;
+  const debut = document.getElementById("cr-debut").value;
+  const fin   = document.getElementById("cr-fin").value;
+  if (!date)            return alert("Veuillez indiquer une date.");
+  if (!debut || !fin)   return alert("Veuillez indiquer l'heure de début et de fin.");
+  if (fin <= debut)     return alert("L'heure de fin doit être après le début.");
+  const libre = document.getElementById("cr-encadrant-libre").value.trim();
+  if (libre && !crEncadrants.includes(libre)) crEncadrants.push(libre);
+
+  let id = document.getElementById("cr-id").value;
+  const existe = !!id;
+  if (!id) id = "cr_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+  await set(ref(db, `creneaux/${id}`), {
+    date, debut, fin,
+    encadrants: crEncadrants,
+    lieu: document.getElementById("cr-lieu").value.trim(),
+    note: document.getElementById("cr-note").value.trim(),
+    createdAt: existe ? (allCreneaux[id]?.createdAt || Date.now()) : Date.now()
+  });
+  fermerCreneauModal();
+}
+window.saveCreneau = saveCreneau;
+
+// ----- Détail d'un créneau -----
+function ouvrirCreneauDetail(id) {
+  const c = allCreneaux[id];
+  if (!c) return;
+  const etudiants = creneauEtudiants(c);
+  const moisNoms = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+  const [yy, mm, dd] = c.date.split("-");
+  const dateLisible = `${parseInt(dd)} ${moisNoms[parseInt(mm) - 1]} ${yy}`;
+
+  const listeEtud = etudiants.length
+    ? etudiants.map(([uid, r]) => {
+        const st = statutEtudiant(r);
+        const badge = st === "valide" ? '<span class="badge-ok">✓</span>'
+          : st === "arelancer" ? '<span class="badge-relance">⚠</span>'
+          : st === "encours" ? '<span class="badge-wait">⏳</span>'
+          : '<span class="badge-none">○</span>';
+        return `<div class="student-row">
+          <div><div class="student-name">${r.meta.prenom || ""} ${r.meta.nom || ""}</div>
+          <div class="student-meta"><span class="filiere-tag">${r.meta.filiere || "—"}</span></div></div>
+          ${badge}</div>`;
+      }).join("")
+    : "<p style='color:var(--muted);font-size:13px'>Aucun étudiant rattaché (personne n'a commencé son bilan pendant cette plage horaire).</p>";
+
+  document.getElementById("cr-detail-contenu").innerHTML = `
+    <h3 style="margin-bottom:6px">📅 ${dateLisible}</h3>
+    <p style="font-size:14px;margin-bottom:4px"><strong>${c.debut}–${c.fin}</strong>${c.lieu ? " · " + c.lieu : ""}</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:4px">👤 ${(c.encadrants || []).join(", ") || "Aucun encadrant"}</p>
+    ${c.note ? `<p style="font-size:13px;color:var(--muted);margin-bottom:10px">📝 ${c.note}</p>` : ""}
+    <div style="display:flex;gap:8px;margin:10px 0 14px">
+      <button class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:13px" onclick="fermerCreneauDetail();ouvrirCreneauModal('${id}')">✏️ Modifier</button>
+      <button class="btn" style="width:auto;padding:6px 12px;font-size:13px;background:var(--rouge-cl);color:var(--rouge);border:1px solid var(--rouge)" onclick="supprimerCreneau('${id}')">🗑 Supprimer</button>
+    </div>
+    <h4 style="font-size:13px;margin-bottom:6px">Étudiants encadrés (${etudiants.length})</h4>
+    ${listeEtud}
+  `;
+  document.getElementById("modal-creneau-detail").classList.add("open");
+}
+window.ouvrirCreneauDetail = ouvrirCreneauDetail;
+
+function fermerCreneauDetail() { document.getElementById("modal-creneau-detail").classList.remove("open"); }
+window.fermerCreneauDetail = fermerCreneauDetail;
+
+async function supprimerCreneau(id) {
+  if (!confirm("Supprimer ce créneau ? (les résultats des étudiants ne sont pas affectés)")) return;
+  await remove(ref(db, `creneaux/${id}`));
+  fermerCreneauDetail();
+}
+window.supprimerCreneau = supprimerCreneau;
 
 </script>
 </body>
