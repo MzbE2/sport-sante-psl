@@ -1303,7 +1303,13 @@ let crEncadrants = [];                 // encadrants en cours d'édition dans la
 let detailCreneauId = null;            // créneau actuellement ouvert en détail
 const HIST_DEFAUT = "2026-09";          // mois affiché par défaut (septembre 2026)
 let histMois = HIST_DEFAUT;             // format "AAAA-MM"
-const ADMIN_EMAIL = "admin@dauphine.psl.eu"; // ← à adapter
+// Comptes administrateurs (rôle admin attribué automatiquement à l'inscription
+// si l'e-mail figure ici). Pour en ajouter/retirer un, modifier cette liste.
+const ADMIN_EMAILS = [
+  "marine.zubaloff@dauphine.psl.eu",
+  "francois.perrot@dauphine.psl.eu"
+];
+function estAdminEmail(email) { return ADMIN_EMAILS.includes((email || "").trim().toLowerCase()); }
 
 function updateUserBar(data) {
   const roleLabels = { etudiant: "Étudiant·e", prof: "Prof SUAPS", admin: "Administrateur" };
@@ -1479,7 +1485,7 @@ async function doRegister() {
   if (!type) return showMsg("register-msg", "Indiquez si vous êtes étudiant ou enseignant.");
 
   // Rôle : admin si email réservé, sinon selon le choix Étudiant / Enseignant.
-  const role = (email === ADMIN_EMAIL) ? "admin" : type;
+  const role = estAdminEmail(email) ? "admin" : type;
 
   // Champs spécifiques aux étudiants
   let filiere = "", sexe = "", annee = "";
