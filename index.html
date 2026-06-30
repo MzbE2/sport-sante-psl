@@ -606,35 +606,43 @@
         <input type="text" id="reg-nom" placeholder="Dupont">
       </div>
       <div class="form-group">
-        <label>Sexe <span style="color:var(--muted);font-weight:400;font-size:12px">(nécessaire à l'analyse des résultats)</span></label>
-        <select id="reg-sexe">
+        <label>Je suis</label>
+        <select id="reg-type" onchange="majTypeInscription()">
           <option value="">— Sélectionner —</option>
-          <option value="F">Femme</option>
-          <option value="H">Homme</option>
+          <option value="etudiant">Étudiant</option>
+          <option value="prof">Enseignant / staff SUAPS</option>
         </select>
       </div>
-      <div class="form-group">
-        <label>Année de naissance <span style="color:var(--muted);font-weight:400;font-size:12px">(pour la tranche d'âge des barèmes)</span></label>
-        <input type="number" id="reg-annee" placeholder="ex : 2004" min="1920" max="2020" step="1">
+
+      <div id="champs-etudiant" style="display:none">
+        <div class="form-group">
+          <label>Filière</label>
+          <select id="reg-filiere">
+            <option value="">— Sélectionner —</option>
+            <option value="LSO">LSO</option>
+            <option value="MSO">MSO</option>
+            <option value="ESCPI">ESCPI</option>
+            <option value="ENS">ENS</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Sexe <span style="color:var(--muted);font-weight:400;font-size:12px">(nécessaire à l'analyse des résultats)</span></label>
+          <select id="reg-sexe">
+            <option value="">— Sélectionner —</option>
+            <option value="F">Femme</option>
+            <option value="H">Homme</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Année de naissance <span style="color:var(--muted);font-weight:400;font-size:12px">(pour la tranche d'âge des barèmes)</span></label>
+          <input type="number" id="reg-annee" placeholder="ex : 2004" min="1920" max="2020" step="1">
+        </div>
       </div>
+
       <div class="form-group">
         <label>Email universitaire</label>
         <input type="email" id="reg-email" placeholder="prenom.nom@dauphine.psl.eu"
           autocomplete="username" style="margin-bottom:0">
-      </div>
-      <div class="form-group">
-        <label>Filière (étudiants L1 uniquement)</label>
-        <select id="reg-filiere">
-          <option value="">— Je suis prof / staff SUAPS —</option>
-          <option value="Gestion">Gestion</option>
-          <option value="Économie">Économie</option>
-          <option value="Informatique">Informatique (MIAGE)</option>
-          <option value="Mathématiques">Mathématiques</option>
-          <option value="Droit">Droit</option>
-          <option value="Finance">Finance</option>
-          <option value="Commerce">Commerce International</option>
-          <option value="Autre">Autre filière</option>
-        </select>
       </div>
       <div class="form-group">
         <label>Mot de passe</label>
@@ -705,14 +713,10 @@
       <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
         <select id="filtre-filiere" onchange="filtrerEtudiants()" style="width:auto; margin-bottom:0; flex:1; min-width:160px">
           <option value="">Toutes les filières</option>
-          <option value="Gestion">Gestion</option>
-          <option value="Économie">Économie</option>
-          <option value="Informatique">Informatique (MIAGE)</option>
-          <option value="Mathématiques">Mathématiques</option>
-          <option value="Droit">Droit</option>
-          <option value="Finance">Finance</option>
-          <option value="Commerce">Commerce International</option>
-          <option value="Autre">Autre filière</option>
+          <option value="LSO">LSO</option>
+          <option value="MSO">MSO</option>
+          <option value="ESCPI">ESCPI</option>
+          <option value="ENS">ENS</option>
         </select>
         <input id="filtre-nom" type="text" placeholder="🔎 Rechercher un nom…" oninput="filtrerEtudiants()" style="width:auto; margin-bottom:0; flex:1; min-width:160px">
         <select id="filtre-statut" onchange="filtrerEtudiants()" style="width:auto; margin-bottom:0; flex:1; min-width:160px">
@@ -752,14 +756,10 @@
       <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap">
         <select id="admin-filtre-filiere" onchange="adminFiltrerResultats()" style="width:auto; margin-bottom:0; flex:1">
           <option value="">Toutes les filières</option>
-          <option value="Gestion">Gestion</option>
-          <option value="Économie">Économie</option>
-          <option value="Informatique">Informatique (MIAGE)</option>
-          <option value="Mathématiques">Mathématiques</option>
-          <option value="Droit">Droit</option>
-          <option value="Finance">Finance</option>
-          <option value="Commerce">Commerce International</option>
-          <option value="Autre">Autre filière</option>
+          <option value="LSO">LSO</option>
+          <option value="MSO">MSO</option>
+          <option value="ESCPI">ESCPI</option>
+          <option value="ENS">ENS</option>
         </select>
       </div>
       <div id="admin-resultats-container"><div class="loading">Chargement…</div></div>
@@ -858,14 +858,10 @@
     <label style="font-size:13px;font-weight:600">Filière du groupe (optionnel)</label>
     <select id="cr-filiere" style="margin-bottom:12px">
       <option value="">— Toutes / non précisée —</option>
-      <option value="Gestion">Gestion</option>
-      <option value="Économie">Économie</option>
-      <option value="Informatique">Informatique (MIAGE)</option>
-      <option value="Mathématiques">Mathématiques</option>
-      <option value="Droit">Droit</option>
-      <option value="Finance">Finance</option>
-      <option value="Commerce">Commerce International</option>
-      <option value="Autre">Autre filière</option>
+      <option value="LSO">LSO</option>
+      <option value="MSO">MSO</option>
+      <option value="ESCPI">ESCPI</option>
+      <option value="ENS">ENS</option>
     </select>
     <div style="display:flex; gap:10px; margin-top:4px">
       <button class="btn btn-primary" style="flex:1" onclick="saveCreneau()">Enregistrer</button>
@@ -1424,6 +1420,14 @@ function showRegister() {
   document.getElementById("form-register").style.display = "block";
 }
 
+// Affiche les champs filière/sexe/âge uniquement pour les étudiants
+function majTypeInscription() {
+  const type = document.getElementById("reg-type").value;
+  const bloc = document.getElementById("champs-etudiant");
+  if (bloc) bloc.style.display = (type === "etudiant") ? "block" : "none";
+}
+window.majTypeInscription = majTypeInscription;
+
 function showTab(tabId, btn) {
   const parent = btn.closest(".page");
   parent.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
@@ -1468,22 +1472,30 @@ async function doRegister() {
   const prenom  = document.getElementById("reg-prenom").value.trim();
   const nom     = document.getElementById("reg-nom").value.trim();
   const email   = document.getElementById("reg-email").value.trim().toLowerCase();
-  const filiere = document.getElementById("reg-filiere").value;
-  const sexe    = document.getElementById("reg-sexe").value;
-  const annee   = document.getElementById("reg-annee").value.trim();
+  const type    = document.getElementById("reg-type").value;
   const pass    = document.getElementById("reg-pass").value;
 
-  if (!prenom || !nom || !email || !pass) return showMsg("register-msg", "Tous les champs sont requis.");
-  // Le sexe et l'année de naissance sont requis pour les étudiants (filière renseignée) :
-  // ils servent à comparer les résultats aux barèmes Femme/Homme et par tranche d'âge.
-  if (filiere && !sexe) return showMsg("register-msg", "Merci d'indiquer le sexe (nécessaire à l'analyse des résultats).");
-  if (filiere && (!annee || +annee < 1920 || +annee > new Date().getFullYear())) return showMsg("register-msg", "Merci d'indiquer une année de naissance valide.");
+  if (!prenom || !nom || !email || !pass) return showMsg("register-msg", "Prénom, nom, email et mot de passe sont requis.");
+  if (!type) return showMsg("register-msg", "Indiquez si vous êtes étudiant ou enseignant.");
+
+  // Rôle : admin si email réservé, sinon selon le choix Étudiant / Enseignant.
+  const role = (email === ADMIN_EMAIL) ? "admin" : type;
+
+  // Champs spécifiques aux étudiants
+  let filiere = "", sexe = "", annee = "";
+  if (role === "etudiant") {
+    filiere = document.getElementById("reg-filiere").value;
+    sexe    = document.getElementById("reg-sexe").value;
+    annee   = document.getElementById("reg-annee").value.trim();
+    if (!filiere) return showMsg("register-msg", "Merci de choisir votre filière (LSO, MSO, ESCPI ou ENS).");
+    if (!sexe)    return showMsg("register-msg", "Merci d'indiquer le sexe (nécessaire à l'analyse des résultats).");
+    if (!annee || +annee < 1920 || +annee > new Date().getFullYear())
+      return showMsg("register-msg", "Merci d'indiquer une année de naissance valide.");
+  }
+
   if (!emailUnivOk(email))
     return showMsg("register-msg", "Email universitaire requis (@dauphine.psl.eu, @dauphine.eu ou @psl.eu).");
   if (pass.length < 8) return showMsg("register-msg", "Mot de passe : 8 caractères minimum.");
-
-  // Rôle par défaut : etudiant. Les profs seront promus par l'admin.
-  const role = (email === ADMIN_EMAIL) ? "admin" : "etudiant";
 
   // Feedback visuel immédiat
   const btnRegister = document.querySelector('#form-register .btn-primary');
@@ -2156,15 +2168,11 @@ function renderAdminUsers() {
             </td>
             <td>
               <select onchange="changerFiliere('${uid}', this.value)" style="width:auto;margin:0;padding:4px 8px;font-size:12px;border-radius:6px;border:1.5px solid var(--gris2)">
-                <option value=""          ${!u.filiere||u.filiere===""?"selected":""}>— Staff SUAPS —</option>
-                <option value="Gestion"        ${u.filiere==="Gestion"       ?"selected":""}>Gestion</option>
-                <option value="Économie"       ${u.filiere==="Économie"      ?"selected":""}>Économie</option>
-                <option value="Informatique"   ${u.filiere==="Informatique"  ?"selected":""}>Informatique (MIAGE)</option>
-                <option value="Mathématiques"  ${u.filiere==="Mathématiques" ?"selected":""}>Mathématiques</option>
-                <option value="Droit"          ${u.filiere==="Droit"         ?"selected":""}>Droit</option>
-                <option value="Finance"        ${u.filiere==="Finance"       ?"selected":""}>Finance</option>
-                <option value="Commerce"       ${u.filiere==="Commerce"      ?"selected":""}>Commerce International</option>
-                <option value="Autre"          ${u.filiere==="Autre"         ?"selected":""}>Autre filière</option>
+                <option value=""       ${!u.filiere||u.filiere===""?"selected":""}>— Staff SUAPS —</option>
+                <option value="LSO"    ${u.filiere==="LSO"   ?"selected":""}>LSO</option>
+                <option value="MSO"    ${u.filiere==="MSO"   ?"selected":""}>MSO</option>
+                <option value="ESCPI"  ${u.filiere==="ESCPI" ?"selected":""}>ESCPI</option>
+                <option value="ENS"    ${u.filiere==="ENS"   ?"selected":""}>ENS</option>
               </select>
             </td>
             <td>
@@ -2576,12 +2584,7 @@ function creneauTimestamp(r) {
   return r.meta?.startedAt || r.meta?.validatedAt || null;
 }
 
-// Libellés lisibles des filières (mêmes valeurs qu'à l'inscription)
-const FILIERE_LABELS = {
-  "Gestion": "Gestion", "Économie": "Économie", "Informatique": "Informatique (MIAGE)",
-  "Mathématiques": "Mathématiques", "Droit": "Droit", "Finance": "Finance",
-  "Commerce": "Commerce International", "Autre": "Autre filière"
-};
+
 function labelFiliere(v) { return FILIERE_LABELS[v] || v || "—"; }
 
 // Étudiants d'un créneau : priorité à l'affectation manuelle (meta.creneauId),
