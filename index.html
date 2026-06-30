@@ -1868,7 +1868,80 @@ window.fermerSucces = function() {
   document.getElementById("succes-overlay").classList.remove("open");
 };
 
+// ── Mes résultats (étudiant) : verdict + légende + familles dépliables ──
+function chargerMesResultats(uid) {
+  onValue(ref(db, `resultats/${uid}`), snap => {
+    const container = document.getElementById("mes-resultats-container");
+    if (!snap.exists()) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Tu n'as pas encore enregistré de résultat. Va dans « Saisir mes résultats » pour commencer.</p>"; return; }
+    const data  = snap.val();
+    const tests = data.tests || {};
+    const meta  = data.meta  || {};
+    const age   = ageDepuis(meta.anneeNaissance);
+    const verdict = calcVerdict(data);
 
+    const idLine = `
+      <div style="margin-bottom:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span class="filiere-tag">${meta.filiere || "—"}</span>
+        ${meta.sexe ? `<span class="filiere-tag" style="background:var(--bleu-cl);color:var(--bleu)">${sexeLabel(meta.sexe)}</span>` : ""}
+        ${meta.valide ? '<span class="badge-ok">✓ Validé par un enseignant</span>' : '<span class="badge-wait">En cours</span>'}
+      </div>`;
+
+    let verdictHTML = "";
+    if (verdict.niveau !== "vide") {
+      const col = COULEURS[verdict.couleur];
+      verdictHTML = `
+        <div class="verdict-card" style="background:${COULEUR_CLAIR[verdict.couleur]}">
+          <div class="vc-ic">${col.emoji}</div>
+          <div>
+            <h2 style="color:${col.hex}">${verdict.titre}</h2>
+            <p>${verdict.txt}</p>
+          </div>
+        </div>`;
+    }
+
+    const pc = verdict.parCouleur || { rouge:0, orange:0, jaune:0, vert:0, bleu:0 };
+    const legende = (verdict.niveau === "vide") ? "" : `
+      <div class="legende">
+        ${["rouge","orange","jaune","vert","bleu"].map(c => `
+          <div class="lg" style="background:${COULEUR_CLAIR[c]};color:${c==="jaune"?"#b8930a":COULEURS[c].hex}">${pc[c]||0}<small>${c}</small></div>`).join("")}
+      </div>`;
+
+    const familles = [...CATEGORIES, ...[...new Set(TESTS.map(t => t.categorie))].filter(c => !CATEGORIES.includes(c))];
+    let famHTML = "";
+    familles.forEach(cat => {
+      const dans = TESTS.filter(t => t.categorie === cat);
+      if (!dans.length) return;
+      const dots = dans.map(t => {
+        const c = couleurResultat(t, tests[t.id], meta.sexe, age);
+        return `<span style="background:${c ? COULEURS[c].hex : "#e0e0e0"}"></span>`;
+      }).join("");
+      const rows = dans.map(t => {
+        const c = couleurResultat(t, tests[t.id], meta.sexe, age);
+        const hex = c ? COULEURS[c].hex : "#e0e0e0";
+        const tcol = c ? (c==="jaune" ? "#b8930a" : COULEURS[c].hex) : "var(--muted)";
+        return `
+          <div class="rrow" style="border-left-color:${hex}">
+            <span class="rdot" style="background:${hex}"></span>
+            <span class="rname">${esc(t.nom)}</span>
+            <span class="rval" style="color:${tcol}">${esc(valeurLisible(t, tests[t.id]))}</span>
+          </div>`;
+      }).join("");
+      famHTML += `
+        <div class="resfam">
+          <button class="resfam-head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="rf-bar"></span>
+            <span class="rf-name">${esc(CAT_LABELS[cat] || cat)}</span>
+            <span class="rf-dots">${dots}</span>
+            <span class="rf-chev">▼</span>
+          </button>
+          <div class="resfam-body">${rows}</div>
+        </div>`;
+    });
+
+    container.innerHTML = idLine + verdictHTML + legende +
+      `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Touche une famille pour déplier le détail</div>` + famHTML;
+  });
+}
 
 // ── PROF ─────────────────────────────────────────────────────
 async function initProf() {
