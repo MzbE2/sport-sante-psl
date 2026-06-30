@@ -244,7 +244,7 @@
   /* ===== CONTENT AREA ===== */
   .content { padding: 20px 16px; max-width: 980px; margin: 0 auto; }
   /* L'admin travaille sur ordinateur : on élargit son espace pour les grands tableaux */
-  #page-admin .content { max-width: 1340px; }
+  #page-admin .content { max-width: min(1560px, 96vw); }
 
   /* ===== CARDS ===== */
   .card {
@@ -384,18 +384,18 @@
   .atelier-fill { height: 100%; background: var(--bleu); border-radius: 6px; transition: width .3s; }
 
   /* ===== ADMIN TABLE ===== */
-  .admin-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: auto; }
+  .admin-table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: auto; }
   .admin-table th {
     background: var(--bleu);
     color: white;
-    padding: 6px 7px;
+    padding: 5px 6px;
     text-align: left;
     font-weight: 600;
-    font-size: 11px;
+    font-size: 10px;
     white-space: nowrap;
   }
-  .admin-table td { padding: 6px 7px; border-bottom: 1px solid var(--gris2); white-space: nowrap; }
-  .admin-table td:first-child { white-space: normal; min-width: 128px; }
+  .admin-table td { padding: 5px 6px; border-bottom: 1px solid var(--gris2); white-space: nowrap; }
+  .admin-table td:first-child { white-space: normal; min-width: 118px; }
   .admin-table tr:hover td { background: var(--gris); }
   .admin-table .actions { display: flex; gap: 4px; flex-wrap: nowrap; }
 
@@ -2210,7 +2210,7 @@ function renderAdminResultats() {
             <td><strong style="font-size:13px">${verdict.niveau==="accompagner"?"🚩 ":""}${r.meta?.prenom||""} ${(r.meta?.nom||"").toUpperCase()}</strong><br><span style="color:var(--muted);font-size:10px">${r.meta?.email||""}</span></td>
             <td><span class="filiere-tag">${r.meta?.filiere||"—"}</span></td>
             <td>${sexeCourt(r.meta?.sexe)}</td>
-            <td>${vCol ? `<span style="font-size:11px;font-weight:700;color:${vCol.hex}">${vCol.emoji} ${verdict.titre}${verdict.nRouge?` (${verdict.nRouge}🔴)`:""}</span>` : "—"}</td>
+            <td style="text-align:center">${vCol ? `<span title="${verdict.titre}${verdict.nRouge?` — ${verdict.nRouge} en rouge`:""}" style="display:inline-block;width:15px;height:15px;border-radius:50%;background:${vCol.hex};vertical-align:middle"></span>` : "—"}</td>
             ${TESTS.map(t => {
               const v = r.tests?.[t.id];
               const c = couleurResultat(t, v, r.meta?.sexe, age);
