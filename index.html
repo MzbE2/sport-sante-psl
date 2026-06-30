@@ -792,7 +792,8 @@
     <div class="card">
       <h3>📋 Tous les résultats</h3>
       <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap">
-        <select id="admin-filtre-filiere" onchange="adminFiltrerResultats()" style="width:auto; margin-bottom:0; flex:1">
+        <input id="admin-search" type="text" placeholder="🔎 Rechercher un étudiant par nom…" oninput="adminFiltrerResultats()" style="margin-bottom:0; flex:2; min-width:200px">
+        <select id="admin-filtre-filiere" onchange="adminFiltrerResultats()" style="width:auto; margin-bottom:0; flex:1; min-width:150px">
           <option value="">Toutes les filières</option>
           <option value="LSO">LSO</option>
           <option value="MSO">MSO</option>
@@ -2168,6 +2169,7 @@ function adminFiltrerResultats() { renderAdminResultats(); }
 
 function renderAdminResultats() {
   const filtre = document.getElementById("admin-filtre-filiere")?.value || "";
+  const search = (document.getElementById("admin-search")?.value || "").trim().toLowerCase();
   const container = document.getElementById("admin-resultats-container");
   if (!container) return;
 
@@ -2175,17 +2177,24 @@ function renderAdminResultats() {
     if (!r.meta) return false;
     if (!r.meta.filiere || r.meta.filiere === "") return false; // exclure profs/admin
     if (filtre && r.meta.filiere !== filtre) return false;
+    if (search) {
+      const nomComplet = `${r.meta.prenom || ""} ${r.meta.nom || ""}`.toLowerCase();
+      if (!nomComplet.includes(search)) return false;
+    }
     return true;
   });
 
-  if (!rows.length) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun résultat étudiant.</p>"; return; }
+  if (!rows.length) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun étudiant ne correspond.</p>"; return; }
 
-  // À accompagner d'abord (plus de rouges en tête)
+  // Tri groupé par couleur de bilan : rouge → orange → jaune → vert → bleu,
+  // puis le plus de rouges en tête, puis ordre alphabétique.
+  const RANG = { rouge:0, orange:1, jaune:2, vert:3, bleu:4 };
   rows.sort(([, a], [, b]) => {
     const va = calcVerdict(a), vb = calcVerdict(b);
-    const pa = va.niveau === "accompagner" ? 0 : 1, pb = vb.niveau === "accompagner" ? 0 : 1;
-    if (pa !== pb) return pa - pb;
-    if (pa === 0) return vb.nRouge - va.nRouge;
+    const ra = va.niveau === "vide" ? 9 : (RANG[va.couleur] ?? 8);
+    const rb = vb.niveau === "vide" ? 9 : (RANG[vb.couleur] ?? 8);
+    if (ra !== rb) return ra - rb;
+    if (vb.nRouge !== va.nRouge) return vb.nRouge - va.nRouge;
     return `${a.meta?.nom||""}`.localeCompare(`${b.meta?.nom||""}`);
   });
 
