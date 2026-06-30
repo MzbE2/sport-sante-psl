@@ -606,6 +606,18 @@
         <input type="text" id="reg-nom" placeholder="Dupont">
       </div>
       <div class="form-group">
+        <label>Sexe <span style="color:var(--muted);font-weight:400;font-size:12px">(nécessaire à l'analyse des résultats)</span></label>
+        <select id="reg-sexe">
+          <option value="">— Sélectionner —</option>
+          <option value="F">Femme</option>
+          <option value="H">Homme</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Année de naissance <span style="color:var(--muted);font-weight:400;font-size:12px">(pour la tranche d'âge des barèmes)</span></label>
+        <input type="number" id="reg-annee" placeholder="ex : 2004" min="1920" max="2020" step="1">
+      </div>
+      <div class="form-group">
         <label>Email universitaire</label>
         <input type="email" id="reg-email" placeholder="prenom.nom@dauphine.psl.eu"
           autocomplete="username" style="margin-bottom:0">
@@ -977,11 +989,135 @@ const db   = getDatabase(app);
 
 // ── Tests par défaut (servent de modèle au premier lancement) ──
 const DEFAULT_TESTS = [
-  { id: "t1", nom: "Test de marche 6 minutes", desc: "Distance parcourue en marchant rapidement pendant 6 min", unite: "m",   placeholder: "ex : 580" },
-  { id: "t2", nom: "Souplesse (sit and reach)",  desc: "Distance atteinte en flexion du tronc, jambes tendues",  unite: "cm",  placeholder: "ex : 12" },
-  { id: "t3", nom: "Force de préhension",         desc: "Force maximale mesurée au dynamomètre, meilleure main",  unite: "kg",  placeholder: "ex : 38" },
-  { id: "t4", nom: "Équilibre unipodal",          desc: "Durée de maintien sur un pied, yeux fermés",            unite: "sec", placeholder: "ex : 25" },
-  { id: "t5", nom: "Indice de masse corporelle",  desc: "IMC calculé ou mesuré sur place",                       unite: "kg/m²",placeholder: "ex : 22.5" },
+  { id:"t1",  code:"imc",      abbr:"IMC",  nom:"Indice de masse corporelle",          desc:"IMC = poids / taille² — saisir poids et taille",                categorie:"IMC",        type:"imc",   unite:"kg/m²",  placeholder:"ex : 22.5", ordre:1 },
+  { id:"t2",  code:"ricci",    abbr:"RIC",  nom:"Activité physique (Ricci & Gagnon)",  desc:"Questionnaire d'auto-évaluation — 9 questions",                 categorie:"Activité",   type:"ricci", unite:"pts",    placeholder:"score /45", ordre:2 },
+  { id:"t3",  code:"step",     abbr:"STEP", nom:"Step test (montée de marche)",        desc:"Fréquence cardiaque après 3 min de step + 1 min de repos",      categorie:"Endurance",  type:"num",   unite:"bpm",    placeholder:"ex : 110",  sensInverse:true, ordre:3 },
+  { id:"t4",  code:"walk",     abbr:"6MM",  nom:"Test 6 minutes de marche",            desc:"Distance parcourue en marchant 6 minutes",                      categorie:"Endurance",  type:"num",   unite:"m",      placeholder:"ex : 720",  ordre:4 },
+  { id:"t5",  code:"chaise",   abbr:"CHA",  nom:"Test de la chaise",                   desc:"Maintien assis dos au mur, angle 90° (force des jambes)",       categorie:"Force",      type:"num",   unite:"sec",    placeholder:"ex : 75",   ordre:5 },
+  { id:"t6",  code:"assis",    abbr:"A-D",  nom:"Test assis-debout",                   desc:"Nombre de levées en 30 secondes",                               categorie:"Force",      type:"num",   unite:"levées", placeholder:"ex : 24",   ordre:6 },
+  { id:"t7",  code:"grip",     abbr:"GRIP", nom:"Hand-grip (préhension)",              desc:"Force de préhension, somme des 2 mains",                        categorie:"Force",      type:"num",   unite:"kg",     placeholder:"ex : 70",   ordre:7 },
+  { id:"t8",  code:"shirado",  abbr:"SHI",  nom:"Test de Shirado",                     desc:"Gainage abdominal : maintien le plus longtemps",                categorie:"Force",      type:"num",   unite:"sec",    placeholder:"ex : 90",   ordre:8 },
+  { id:"t9",  code:"sorensen", abbr:"SOR",  nom:"Test de Sorensen",                    desc:"Gainage lombaire : maintien le plus longtemps",                 categorie:"Force",      type:"num",   unite:"sec",    placeholder:"ex : 100",  ordre:9 },
+  { id:"t10", code:"flamand",  abbr:"FLA",  nom:"Test du flamand (équilibre)",         desc:"Équilibre sur un pied, yeux fermés",                            categorie:"Équilibre",  type:"num",   unite:"sec",    placeholder:"ex : 25",   ordre:10 },
+  { id:"t11", code:"flex",     abbr:"FLEX", nom:"Souplesse au flexomètre",             desc:"Flexion du tronc assis, jambes tendues",                        categorie:"Souplesse",  type:"num",   unite:"cm",     placeholder:"ex : 30",   ordre:11 },
+  { id:"t12", code:"souplmp",  abbr:"S-MP", nom:"Souplesse main / pied",               desc:"Flexion du tronc debout — position atteinte",                   categorie:"Souplesse",  type:"choix", unite:"",       placeholder:"",          ordre:12 },
+  { id:"t13", code:"souplep",  abbr:"S-EP", nom:"Souplesse de l'épaule",               desc:"Mains jointes dans le dos — position atteinte",                 categorie:"Souplesse",  type:"choix", unite:"",       placeholder:"",          ordre:13 },
+];
+
+// Ordre d'affichage des familles (comme la fiche individuelle)
+const CATEGORIES = ["IMC", "Activité", "Endurance", "Force", "Équilibre", "Souplesse"];
+
+// ── Couleurs du bilan (du moins bon au meilleur) ──────────────
+const COULEURS = {
+  rouge:  { hex:"#c0392b", pts:1, label:"Rouge",  emoji:"🔴" },
+  orange: { hex:"#e67e22", pts:2, label:"Orange", emoji:"🟠" },
+  jaune:  { hex:"#f1c40f", pts:3, label:"Jaune",  emoji:"🟡" },
+  vert:   { hex:"#1a7a4a", pts:4, label:"Vert",   emoji:"🟢" },
+  bleu:   { hex:"#1a56a0", pts:5, label:"Bleu",   emoji:"🔵" },
+};
+const COULEUR_CLAIR = { rouge:"#fdecea", orange:"#fef3e2", jaune:"#fdf6d0", vert:"#e6f4ed", bleu:"#e8f0fb" };
+
+// ── Barèmes officiels par défaut (modifiables par l'admin) ─────
+// num/ricci → seuils [s1,s2,s3,s4] = 4 bornes, 5 zones.
+//   sens "haut" (plus haut = mieux) : <s1 rouge, <s2 orange, <s3 jaune, <s4 vert, ≥s4 bleu
+//   sens "bas"  (plus bas  = mieux) : ≤s1 bleu, ≤s2 vert, ≤s3 jaune, ≤s4 orange, >s4 rouge
+const DEFAULT_BAREMES = {
+  // ENDURANCE
+  step:     { kind:"ageSexe", sens:"bas",  tranches:{
+    "-25":  {F:[95,100,110,120],  H:[100,105,110,115]},
+    "26-35":{F:[97,102,112,122],  H:[102,107,112,118]},
+    "36-45":{F:[100,106,116,126], H:[105,110,116,122]},
+    "46-55":{F:[103,110,120,130], H:[108,114,120,128]},
+    "56-65":{F:[106,114,124,134], H:[110,118,124,132]},
+    "+65":  {F:[110,118,128,138], H:[114,122,128,136]} } },
+  walk:     { kind:"ageSexe", sens:"haut", tranches:{
+    "20-29":{F:[672,707,742,777], H:[725,763,801,839]},
+    "30-39":{F:[614,649,684,719], H:[675,713,751,789]},
+    "40-49":{F:[556,591,626,661], H:[585,624,662,700]},
+    "50-59":{F:[498,533,568,603], H:[575,613,651,689]},
+    "+60":  {F:[441,476,511,546], H:[524,562,600,638]} } },
+  // FORCE
+  chaise:   { kind:"universel", sens:"haut", seuils:[45,60,90,180] },
+  assis:    { kind:"ageSexe", sens:"haut", tranches:{
+    "20-29":{F:[21,27,32,35], H:[21,30,32,35]},
+    "30-39":{F:[19,24,28,31], H:[22,31,33,35]},
+    "40-49":{F:[16,21,24,27], H:[19,22,26,30]},
+    "50-59":{F:[13,15,18,20], H:[15,18,20,23]},
+    "+60":  {F:[11,13,15,18], H:[14,16,18,20]} } },
+  grip:     { kind:"ageSexe", sens:"haut", tranches:{
+    "15-19":{F:[55,61,65,71],     H:[78,85,95,110]},
+    "20-29":{F:[55,61,66,71],     H:[95,101,106,114]},
+    "30-39":{F:[55,61,66,71],     H:[95,101,106,113]},
+    "40-49":{F:[54,60,65,70],     H:[90,96,101,110]},
+    "50-59":{F:[52,58,63,68],     H:[85,92,98,105]},
+    "+60":  {F:[48,54,59,64],     H:[78,85,90,100]} } },
+  shirado:  { kind:"universel", sens:"haut", seuils:[30,60,90,120] },
+  sorensen: { kind:"ageSexe", sens:"haut", tranches:{
+    "20-29":{F:[55,75,105,120], H:[60,85,105,120]},
+    "30-39":{F:[50,70,100,115], H:[55,80,100,118]},
+    "40-49":{F:[40,60,90,110],  H:[45,65,95,115]},
+    "50-59":{F:[35,55,80,100],  H:[40,60,85,105]},
+    "+60":  {F:[30,45,70,90],   H:[33,50,75,95]} } },
+  // ÉQUILIBRE
+  flamand:  { kind:"ageSexe", sens:"haut", tranches:{
+    "-30":  {F:[10,15,20,25], H:[13,17,20,24]},
+    "31-39":{F:[9,13,18,22],  H:[11,15,19,23]},
+    "40-49":{F:[8,12,16,20],  H:[10,14,18,22]},
+    "50-59":{F:[7,10,14,18],  H:[8,12,16,20]},
+    "+60":  {F:[5,8,12,16],   H:[6,10,14,18]} } },
+  // SOUPLESSE
+  flex:     { kind:"ageSexe", sens:"haut", tranches:{
+    "-19":  {F:[20,30,39,48], H:[20,30,39,48]},
+    "20-29":{F:[19,29,38,46], H:[19,28,37,45]},
+    "30-39":{F:[19,29,38,46], H:[18,27,36,44]},
+    "40-49":{F:[18,28,37,45], H:[17,26,35,43]},
+    "50-59":{F:[17,27,36,44], H:[15,24,33,41]},
+    "+60":  {F:[16,26,35,43], H:[14,23,32,40]} } },
+  // ACTIVITÉ
+  ricci:    { kind:"universel", sens:"haut", seuils:[10,19,28,37] },
+  // CORPULENCE (normal = meilleur ; les deux extrêmes sont signalés)
+  imc:      { kind:"imc", bandes:[
+    { max:18.5, couleur:"orange" },   // insuffisance pondérale → à surveiller
+    { max:25,   couleur:"bleu"   },   // corpulence normale (Bravo !)
+    { max:30,   couleur:"vert"   },   // surpoids
+    { max:35,   couleur:"jaune"  },   // obésité grade 1
+    { max:40,   couleur:"orange" },   // obésité grade 2
+    { max:999,  couleur:"rouge"  } ]},// obésité grade 3
+  // CHOIX (positions → couleur directe)
+  souplmp:  { kind:"choix", options:[
+    { cle:"cuisses",   label:"Mains sur les cuisses",   couleur:"rouge"  },
+    { cle:"genoux",    label:"Mains sur les genoux",    couleur:"orange" },
+    { cle:"tibias",    label:"Mains sur les tibias",    couleur:"jaune"  },
+    { cle:"chevilles", label:"Mains sur les chevilles", couleur:"vert"   },
+    { cle:"sol",       label:"Paume de la main au sol", couleur:"bleu"   } ] },
+  souplep:  { kind:"choix", options:[
+    { cle:"jamais",     label:"N'y parvient pas",            couleur:"rouge"  },
+    { cle:"loin",       label:"Mains ne se touchent pas",    couleur:"orange" },
+    { cle:"doigts",     label:"Bouts des doigts se touchent",couleur:"jaune"  },
+    { cle:"agrippent",  label:"Les doigts s'agrippent",      couleur:"vert"   },
+    { cle:"superposer", label:"Les mains se superposent",    couleur:"bleu"   } ] },
+};
+
+// Questionnaire Ricci & Gagnon (9 questions, chaque réponse vaut 1 à 5)
+const RICCI_QUESTIONS = [
+  { q:"Combien de temps passez-vous assis par jour (loisirs, télé, ordinateur, travail…) ?",
+    r:["Plus de 5 h","4 à 5 h","3 à 4 h","2 à 3 h","Moins de 2 h"] },
+  { q:"Pratiquez-vous régulièrement une ou des activités physiques ?",
+    r:["Non","—","—","—","Oui"] },
+  { q:"À quelle fréquence pratiquez-vous ces activités ?",
+    r:["1 à 2 fois / mois","1 fois / semaine","2 fois / semaine","3 fois / semaine","4 fois et + / semaine"] },
+  { q:"Combien de minutes en moyenne par séance d'activité physique ?",
+    r:["Moins de 15'","16 à 30'","30 à 45'","45 à 60'","Plus de 60'"] },
+  { q:"Habituellement, comment percevez-vous votre effort ? (1 = très facile, 5 = difficile)",
+    r:["1","2","3","4","5"] },
+  { q:"Quelle intensité d'activité physique votre travail (ou vos études) requiert-il ?",
+    r:["Légère","Modérée","Moyenne","Intense","Très intense"] },
+  { q:"Hors travail, combien d'heures par semaine de travaux légers (bricolage, ménage, jardinage…) ?",
+    r:["Moins de 2 h","3 à 4 h","5 à 6 h","7 à 9 h","Plus de 10 h"] },
+  { q:"Combien de minutes par jour consacrez-vous à la marche ?",
+    r:["Moins de 15'","16 à 30'","30 à 45'","45 à 60'","Plus de 60'"] },
+  { q:"Combien d'étages en moyenne montez-vous à pied chaque jour ?",
+    r:["0 à 2","3 à 5","6 à 10","11 à 15","16 et plus"] },
 ];
 
 // Liste « vivante » des tests, alimentée depuis la base (modifiable par l'admin).
@@ -993,6 +1129,9 @@ const DOMAINES_AUTORISES = ["@dauphine.psl.eu", "@dauphine.eu", "@psl.eu"];
 function emailUnivOk(email){ return DOMAINES_AUTORISES.some(d => email.endsWith(d)); }
 function esc(s){ return String(s ?? "").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function val(id){ const el = document.getElementById(id); return el ? el.value : ""; }
+// Libellés du sexe (stocké en "F"/"H" pour coller aux abaques Femme/Homme du bilan)
+function sexeLabel(s){ return s === "F" ? "Femme" : s === "H" ? "Homme" : "—"; }
+function sexeCourt(s){ return s === "F" ? "F" : s === "H" ? "H" : "—"; }
 
 // Charge les tests depuis /tests. En cas d'absence ou d'erreur (droits/offline),
 // on garde les tests par défaut pour que l'app reste utilisable.
@@ -1003,8 +1142,13 @@ async function chargerTests() {
       const obj = snap.val();
       TESTS = Object.entries(obj).map(([id, t]) => ({
         id,
+        code: t.code || id,
+        abbr: t.abbr || (t.code || id).toUpperCase(),
         nom: t.nom || id,
         desc: t.desc || "",
+        categorie: t.categorie || "Autre",
+        type: t.type || "num",
+        sensInverse: !!t.sensInverse,
         unite: t.unite || "",
         placeholder: t.placeholder || "ex : …",
         ordre: t.ordre ?? 99
@@ -1022,6 +1166,133 @@ function genTestId() {
   let max = 0;
   TESTS.forEach(t => { const m = /^t(\d+)$/.exec(t.id); if (m) max = Math.max(max, parseInt(m[1], 10)); });
   return "t" + (max + 1);
+}
+
+// ── BARÈMES : moteur de notation couleur ─────────────────────
+let BAREMES = JSON.parse(JSON.stringify(DEFAULT_BAREMES));
+
+// Charge les barèmes depuis /baremes (sinon défauts). Fusionne par code.
+async function chargerBaremes() {
+  try {
+    const snap = await get(ref(db, "baremes"));
+    if (snap.exists()) {
+      const obj = snap.val();
+      BAREMES = JSON.parse(JSON.stringify(DEFAULT_BAREMES));
+      Object.entries(obj).forEach(([code, b]) => { BAREMES[code] = b; });
+    } else {
+      BAREMES = JSON.parse(JSON.stringify(DEFAULT_BAREMES));
+    }
+  } catch (e) {
+    BAREMES = JSON.parse(JSON.stringify(DEFAULT_BAREMES));
+  }
+}
+
+// Âge à partir de l'année de naissance
+function ageDepuis(annee) {
+  const a = parseInt(annee, 10);
+  if (!a || a < 1900) return null;
+  return new Date().getFullYear() - a;
+}
+
+// Choisit la bonne tranche d'âge parmi les clés d'un barème ("-25","26-35","+65"…)
+function trancheAge(age, tranches) {
+  const cles = Object.keys(tranches);
+  if (age == null) return cles[0]; // par défaut, tranche la plus jeune
+  const parse = c => {
+    if (c.startsWith("-")) return { min:-Infinity, max:parseInt(c.slice(1),10) };
+    if (c.startsWith("+")) return { min:parseInt(c.slice(1),10), max:Infinity };
+    const [a,b] = c.split("-").map(n=>parseInt(n,10)); return { min:a, max:b };
+  };
+  for (const c of cles) { const r = parse(c); if (age >= r.min && age <= r.max) return c; }
+  // hors bornes → tranche la plus proche
+  const first = parse(cles[0]);
+  if (age < first.min || (cles[0].startsWith("-") && age <= first.max)) return cles[0];
+  return cles[cles.length - 1];
+}
+
+// Couleur à partir de 4 seuils + sens
+function couleurSeuils(val, seuils, sens) {
+  const [s1,s2,s3,s4] = seuils;
+  if (sens === "bas") {
+    if (val <= s1) return "bleu";
+    if (val <= s2) return "vert";
+    if (val <= s3) return "jaune";
+    if (val <= s4) return "orange";
+    return "rouge";
+  }
+  if (val < s1) return "rouge";
+  if (val < s2) return "orange";
+  if (val < s3) return "jaune";
+  if (val < s4) return "vert";
+  return "bleu";
+}
+
+// Couleur d'un résultat : renvoie "rouge|orange|jaune|vert|bleu" ou null
+function couleurResultat(test, valeur, sexe, age) {
+  if (valeur === undefined || valeur === null || valeur === "") return null;
+  const b = BAREMES[test.code];
+  if (!b) return null;
+  if (b.kind === "choix") {
+    const o = (b.options || []).find(o => o.cle === valeur);
+    return o ? o.couleur : null;
+  }
+  if (b.kind === "imc") {
+    const v = parseFloat(valeur);
+    for (const bande of b.bandes) { if (v < bande.max) return bande.couleur; }
+    return "rouge";
+  }
+  const v = parseFloat(valeur);
+  if (isNaN(v)) return null;
+  if (b.kind === "universel") return couleurSeuils(v, b.seuils, b.sens);
+  if (b.kind === "ageSexe") {
+    const sx = (sexe === "H") ? "H" : "F";
+    const tr = trancheAge(age, b.tranches);
+    const seuils = b.tranches[tr] && b.tranches[tr][sx];
+    if (!seuils) return null;
+    return couleurSeuils(v, seuils, b.sens);
+  }
+  return null;
+}
+
+// Libellé lisible d'une valeur (gère les choix)
+function valeurLisible(test, valeur) {
+  if (valeur === undefined || valeur === null || valeur === "") return "—";
+  if (test.type === "choix") {
+    const b = BAREMES[test.code];
+    const o = b && (b.options || []).find(o => o.cle === valeur);
+    return o ? o.label : valeur;
+  }
+  return valeur + (test.unite ? " " + test.unite : "");
+}
+
+// Verdict bienveillant d'un bilan (majorité de couleurs sur les 13 tests)
+function calcVerdict(r) {
+  const meta = r.meta || {};
+  const tests = r.tests || {};
+  const age = ageDepuis(meta.anneeNaissance);
+  let nRouge=0, nOrange=0, nJaune=0, nVert=0, nBleu=0, total=0;
+  const parCouleur = { rouge:0, orange:0, jaune:0, vert:0, bleu:0 };
+  TESTS.forEach(t => {
+    const c = couleurResultat(t, tests[t.id], meta.sexe, age);
+    if (!c) return;
+    total++; parCouleur[c]++;
+    if (c==="rouge") nRouge++; else if (c==="orange") nOrange++;
+    else if (c==="jaune") nJaune++; else if (c==="vert") nVert++; else nBleu++;
+  });
+  if (total === 0) return { niveau:"vide", nRouge:0, total:0 };
+  const aRevoir = nRouge + nOrange;   // rouge + orange
+  const moyen   = nJaune;             // jaune
+  const bon     = nVert + nBleu;      // vert + bleu
+  let niveau;
+  if (aRevoir >= moyen && aRevoir >= bon) niveau = "accompagner";
+  else if (bon >= moyen && bon >= aRevoir) niveau = "forme";
+  else niveau = "moyen";
+  const MESSAGES = {
+    accompagner: { titre:"À accompagner", txt:"Pas de panique ! Nous vous conseillons de rencontrer un professionnel de l'activité physique qui saura vous proposer des exercices adaptés. N'hésitez pas à lui montrer vos résultats." , couleur:"rouge" },
+    moyen:       { titre:"Peut mieux faire", txt:"C'est bien, mais vous pouvez sans doute faire un peu plus, un peu plus longtemps. Trouvez l'activité physique qui vous fait plaisir." , couleur:"jaune" },
+    forme:       { titre:"En bonne forme", txt:"Félicitations ! Vous êtes en bonne forme physique. Pensez à vous entretenir régulièrement." , couleur:"vert" },
+  };
+  return { niveau, ...MESSAGES[niveau], nRouge, total, parCouleur };
 }
 
 // ── Variables globales (exposées sur window pour les handlers inline) ──
@@ -1196,9 +1467,15 @@ async function doRegister() {
   const nom     = document.getElementById("reg-nom").value.trim();
   const email   = document.getElementById("reg-email").value.trim().toLowerCase();
   const filiere = document.getElementById("reg-filiere").value;
+  const sexe    = document.getElementById("reg-sexe").value;
+  const annee   = document.getElementById("reg-annee").value.trim();
   const pass    = document.getElementById("reg-pass").value;
 
   if (!prenom || !nom || !email || !pass) return showMsg("register-msg", "Tous les champs sont requis.");
+  // Le sexe et l'année de naissance sont requis pour les étudiants (filière renseignée) :
+  // ils servent à comparer les résultats aux barèmes Femme/Homme et par tranche d'âge.
+  if (filiere && !sexe) return showMsg("register-msg", "Merci d'indiquer le sexe (nécessaire à l'analyse des résultats).");
+  if (filiere && (!annee || +annee < 1920 || +annee > new Date().getFullYear())) return showMsg("register-msg", "Merci d'indiquer une année de naissance valide.");
   if (!emailUnivOk(email))
     return showMsg("register-msg", "Email universitaire requis (@dauphine.psl.eu, @dauphine.eu ou @psl.eu).");
   if (pass.length < 8) return showMsg("register-msg", "Mot de passe : 8 caractères minimum.");
@@ -1224,12 +1501,12 @@ async function doRegister() {
     const uid = cred.user.uid;
 
     await set(ref(db, `users/${uid}`), {
-      prenom, nom, email, filiere, role,
+      prenom, nom, email, filiere, sexe, anneeNaissance: annee ? +annee : null, role,
       createdAt: Date.now()
     });
 
     await set(ref(db, `resultats/${uid}/meta`), {
-      prenom, nom, email, filiere,
+      prenom, nom, email, filiere, sexe, anneeNaissance: annee ? +annee : null,
       session: new Date().toISOString().slice(0, 7),
       valide: false,
       createdAt: Date.now()
@@ -1240,8 +1517,8 @@ async function doRegister() {
     currentRole = role;
     document.getElementById("btn-logout").style.display = "block";
     showPage(role);
-    updateUserBar({ prenom, nom, email, filiere, role });
-    if (role === "etudiant") initEtudiant(uid, { prenom, nom, email, filiere, role });
+    updateUserBar({ prenom, nom, email, filiere, sexe, anneeNaissance: annee ? +annee : null, role });
+    if (role === "etudiant") initEtudiant(uid, { prenom, nom, email, filiere, sexe, anneeNaissance: annee ? +annee : null, role });
     if (role === "prof")     initProf();
     if (role === "admin")    initAdmin();
 
@@ -1266,51 +1543,175 @@ async function logout() {
 // ── ÉTUDIANT ─────────────────────────────────────────────────
 async function initEtudiant(uid, userData) {
   await chargerTests();
+  await chargerBaremes();
   renderTests(uid);
   chargerMesResultats(uid);
 }
 
-function renderTests(uid) {
-  const container = document.getElementById("tests-container");
-  container.innerHTML = TESTS.map(t => `
-    <div class="test-item">
-      <div class="test-nom">${t.nom}</div>
-      <div class="test-desc">${t.desc}</div>
-      <div class="test-input-row">
-        <input type="number" id="input-${t.id}" placeholder="${t.placeholder}"
-          onchange="sauvegarderTest('${uid}', '${t.id}', this.value)"
-          step="any" min="0">
-        <span class="test-unite">${t.unite}</span>
-      </div>
-      <div class="test-saved" id="saved-${t.id}">✓ Sauvegardé</div>
-    </div>
-  `).join("");
+let monSexe = null, monAge = null;
 
-  // Charger les valeurs existantes
-  get(ref(db, `resultats/${uid}/tests`)).then(snap => {
-    if (snap.exists()) {
-      const tests = snap.val();
-      TESTS.forEach(t => {
-        if (tests[t.id] !== undefined) {
-          const inp = document.getElementById(`input-${t.id}`);
-          if (inp) inp.value = tests[t.id];
-        }
-      });
-    }
+function pastilleHTML(id) {
+  return `<span id="dot-${id}" style="display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid var(--gris2);background:transparent;flex-shrink:0" title=""></span>`;
+}
+function majPastille(t, valeur) {
+  const dot = document.getElementById(`dot-${t.id}`);
+  if (!dot) return;
+  const c = couleurResultat(t, valeur, monSexe, monAge);
+  if (c) { dot.style.background = COULEURS[c].hex; dot.style.borderColor = COULEURS[c].hex; dot.title = COULEURS[c].label; }
+  else   { dot.style.background = "transparent"; dot.style.borderColor = "var(--gris2)"; dot.title = ""; }
+}
+function blinkSaved(id) {
+  const el = document.getElementById(`saved-${id}`);
+  if (el) { el.style.display = "block"; setTimeout(() => el.style.display = "none", 2000); }
+}
+
+function blocTest(uid, t, meta, valeurs) {
+  const v = valeurs[t.id];
+  const tete = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div><div class="test-nom">${esc(t.nom)}</div><div class="test-desc">${esc(t.desc)}</div></div>
+      ${pastilleHTML(t.id)}
+    </div>`;
+  let corps = "";
+  if (t.type === "imc") {
+    corps = `
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:8px">
+        <div><label style="font-size:12px;color:var(--muted)">Poids (kg)</label>
+          <input type="number" id="imc-poids" value="${meta.poids ?? ""}" placeholder="ex : 65" step="any" min="0" onchange="saveIMC('${uid}')" style="margin:4px 0 0;padding:8px;width:110px"></div>
+        <div><label style="font-size:12px;color:var(--muted)">Taille (cm)</label>
+          <input type="number" id="imc-taille" value="${meta.taille ?? ""}" placeholder="ex : 172" step="any" min="0" onchange="saveIMC('${uid}')" style="margin:4px 0 0;padding:8px;width:110px"></div>
+        <div style="font-size:14px">IMC : <strong id="imc-val">${v ?? "—"}</strong> kg/m²</div>
+      </div>`;
+  } else if (t.type === "ricci") {
+    corps = `
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px">
+        <span style="font-size:14px">Score : <strong id="ricci-score">${v ?? "—"}</strong> / 45</span>
+        <button class="btn btn-outline" style="width:auto;padding:7px 14px" onclick="ouvrirRicci('${uid}')">Répondre au questionnaire</button>
+      </div>`;
+  } else if (t.type === "choix") {
+    const b = BAREMES[t.code] || { options: [] };
+    corps = `
+      <div class="test-input-row" style="margin-top:8px">
+        <select id="input-${t.id}" onchange="saveChoix('${uid}','${t.id}',this.value)" style="margin:0;padding:9px">
+          <option value="">— Sélectionner la position —</option>
+          ${b.options.map(o => `<option value="${o.cle}" ${v === o.cle ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
+        </select>
+      </div>`;
+  } else {
+    corps = `
+      <div class="test-input-row" style="margin-top:8px">
+        <input type="number" id="input-${t.id}" placeholder="${esc(t.placeholder)}" value="${v ?? ""}"
+          onchange="sauvegarderTest('${uid}','${t.id}',this.value)" step="any" min="0">
+        <span class="test-unite">${esc(t.unite)}</span>
+      </div>`;
+  }
+  return `<div class="test-item">${tete}${corps}<div class="test-saved" id="saved-${t.id}">✓ Sauvegardé</div></div>`;
+}
+
+async function renderTests(uid) {
+  const container = document.getElementById("tests-container");
+  const [metaSnap, testsSnap] = await Promise.all([
+    get(ref(db, `resultats/${uid}/meta`)),
+    get(ref(db, `resultats/${uid}/tests`))
+  ]);
+  const meta    = metaSnap.exists() ? metaSnap.val() : {};
+  const valeurs = testsSnap.exists() ? testsSnap.val() : {};
+  monSexe = meta.sexe || null;
+  monAge  = ageDepuis(meta.anneeNaissance);
+
+  let html = "";
+  const familles = [...CATEGORIES, ...[...new Set(TESTS.map(t => t.categorie))].filter(c => !CATEGORIES.includes(c))];
+  familles.forEach(cat => {
+    const dans = TESTS.filter(t => t.categorie === cat);
+    if (!dans.length) return;
+    html += `<h3 style="margin:18px 0 8px;color:var(--bleu);font-size:15px;border-bottom:1px solid var(--gris2);padding-bottom:4px">${esc(cat)}</h3>`;
+    dans.forEach(t => { html += blocTest(uid, t, meta, valeurs); });
   });
+  container.innerHTML = html;
+  TESTS.forEach(t => majPastille(t, valeurs[t.id]));
+}
+
+async function marquerDebut(uid) {
+  const startSnap = await get(ref(db, `resultats/${uid}/meta/startedAt`));
+  if (!startSnap.exists()) await update(ref(db, `resultats/${uid}/meta`), { startedAt: Date.now() });
 }
 
 window.sauvegarderTest = async function(uid, testId, valeur) {
   if (valeur === "") return;
   await set(ref(db, `resultats/${uid}/tests/${testId}`), parseFloat(valeur));
-  // Horodatage de la 1re saisie : sert à rattacher automatiquement
-  // l'étudiant au créneau pendant lequel il a démarré son bilan.
-  const startSnap = await get(ref(db, `resultats/${uid}/meta/startedAt`));
-  if (!startSnap.exists()) {
-    await update(ref(db, `resultats/${uid}/meta`), { startedAt: Date.now() });
+  await marquerDebut(uid);
+  const t = TESTS.find(x => x.id === testId); if (t) majPastille(t, parseFloat(valeur));
+  blinkSaved(testId);
+};
+
+window.saveChoix = async function(uid, testId, cle) {
+  if (cle === "") { await remove(ref(db, `resultats/${uid}/tests/${testId}`)); }
+  else { await set(ref(db, `resultats/${uid}/tests/${testId}`), cle); await marquerDebut(uid); }
+  const t = TESTS.find(x => x.id === testId); if (t) majPastille(t, cle || undefined);
+  blinkSaved(testId);
+};
+
+window.saveIMC = async function(uid) {
+  const poids  = parseFloat(document.getElementById("imc-poids").value);
+  const taille = parseFloat(document.getElementById("imc-taille").value);
+  const tImc = TESTS.find(t => t.code === "imc"); if (!tImc) return;
+  if (!poids || !taille) return;
+  const imc = +(poids / Math.pow(taille / 100, 2)).toFixed(1);
+  await update(ref(db, `resultats/${uid}/meta`), { poids, taille });
+  await set(ref(db, `resultats/${uid}/tests/${tImc.id}`), imc);
+  await marquerDebut(uid);
+  const valEl = document.getElementById("imc-val"); if (valEl) valEl.textContent = imc;
+  majPastille(tImc, imc);
+  blinkSaved(tImc.id);
+};
+
+// ── Questionnaire Ricci & Gagnon ─────────────────────────────
+window.ouvrirRicci = async function(uid) {
+  const snap = await get(ref(db, `resultats/${uid}/ricci`));
+  const rep = snap.exists() ? snap.val() : {};
+  document.getElementById("modal-ricci")?.remove();
+  const m = document.createElement("div");
+  m.id = "modal-ricci";
+  m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px";
+  m.innerHTML = `
+    <div style="background:#fff;border-radius:12px;max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:22px">
+      <h3 style="margin-bottom:4px">Activité physique — Ricci & Gagnon</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Répondez aux 9 questions ; le score et la couleur se calculent automatiquement.</p>
+      ${RICCI_QUESTIONS.map((Q, qi) => `
+        <div style="margin-bottom:14px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">${qi + 1}. ${esc(Q.q)}</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            ${Q.r.map((opt, oi) => opt === "—" ? "" : `
+              <label style="font-size:13px;display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="radio" name="ricci-${qi}" value="${oi + 1}" ${rep[qi] === oi + 1 ? "checked" : ""} style="margin:0;width:auto"> ${esc(opt)}
+              </label>`).join("")}
+          </div>
+        </div>`).join("")}
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;position:sticky;bottom:0;background:#fff;padding-top:10px">
+        <button class="btn btn-outline" style="width:auto;padding:9px 18px" onclick="document.getElementById('modal-ricci').remove()">Annuler</button>
+        <button class="btn btn-primary" style="width:auto;padding:9px 18px" onclick="enregistrerRicci('${uid}')">Valider le questionnaire</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+};
+
+window.enregistrerRicci = async function(uid) {
+  const reponses = {}; let total = 0, repondues = 0;
+  RICCI_QUESTIONS.forEach((Q, qi) => {
+    const sel = document.querySelector(`input[name="ricci-${qi}"]:checked`);
+    if (sel) { reponses[qi] = +sel.value; total += +sel.value; repondues++; }
+  });
+  if (repondues < RICCI_QUESTIONS.length) {
+    if (!confirm(`Vous avez répondu à ${repondues}/${RICCI_QUESTIONS.length} questions. Enregistrer quand même ?`)) return;
   }
-  const el = document.getElementById(`saved-${testId}`);
-  if (el) { el.style.display = "block"; setTimeout(() => el.style.display = "none", 2000); }
+  const tRicci = TESTS.find(t => t.code === "ricci"); if (!tRicci) return;
+  await set(ref(db, `resultats/${uid}/ricci`), reponses);
+  await set(ref(db, `resultats/${uid}/tests/${tRicci.id}`), total);
+  await marquerDebut(uid);
+  const sc = document.getElementById("ricci-score"); if (sc) sc.textContent = total;
+  majPastille(tRicci, total);
+  blinkSaved(tRicci.id);
+  document.getElementById("modal-ricci")?.remove();
 };
 
 async function validerSaisie() {
@@ -1406,21 +1807,38 @@ function chargerMesResultats(uid) {
     const data  = snap.val();
     const tests = data.tests || {};
     const meta  = data.meta  || {};
+    const age   = ageDepuis(meta.anneeNaissance);
+    const verdict = calcVerdict(data);
+
+    let verdictHTML = "";
+    if (verdict.niveau !== "vide") {
+      const col = COULEURS[verdict.couleur];
+      verdictHTML = `
+        <div style="border-radius:10px;padding:16px;margin-bottom:16px;background:${COULEUR_CLAIR[verdict.couleur]};border-left:5px solid ${col.hex}">
+          <div style="font-weight:700;font-size:16px;color:${col.hex};margin-bottom:4px">${col.emoji} ${verdict.titre}</div>
+          <div style="font-size:13px;color:#333">${verdict.txt}</div>
+        </div>`;
+    }
+
     container.innerHTML = `
       <div style="margin-bottom:12px">
         <span class="filiere-tag">${meta.filiere || "—"}</span>
+        ${meta.sexe ? `<span class="filiere-tag" style="background:var(--bleu-cl);color:var(--bleu)">${sexeLabel(meta.sexe)}</span>` : ""}
         <span style="font-size:12px;color:var(--muted);margin-left:8px">Session ${meta.session || "—"}</span>
         ${meta.valide ? '<span class="badge-ok" style="margin-left:8px">✓ Validé</span>' : '<span class="badge-wait" style="margin-left:8px">En cours</span>'}
       </div>
-      ${TESTS.map(t => `
+      ${verdictHTML}
+      ${TESTS.map(t => {
+        const c = couleurResultat(t, tests[t.id], meta.sexe, age);
+        const pastille = c
+          ? `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${COULEURS[c].hex};margin-right:8px;vertical-align:middle"></span>`
+          : `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid var(--gris2);margin-right:8px;vertical-align:middle"></span>`;
+        return `
         <div class="result-row">
-          <span class="result-nom">${t.nom}</span>
-          <div>
-            <span class="result-val">${tests[t.id] !== undefined ? tests[t.id] : "—"}</span>
-            <span class="result-unite">${t.unite}</span>
-          </div>
-        </div>
-      `).join("")}
+          <span class="result-nom">${pastille}${esc(t.nom)}</span>
+          <div><span class="result-val">${esc(valeurLisible(t, tests[t.id]))}</span></div>
+        </div>`;
+      }).join("")}
     `;
   });
 }
@@ -1428,6 +1846,7 @@ function chargerMesResultats(uid) {
 // ── PROF ─────────────────────────────────────────────────────
 async function initProf() {
   await chargerTests();
+  await chargerBaremes();
   onValue(ref(db, "resultats"), snap => {
     allResultats = snap.exists() ? snap.val() : {};
     renderProfStats();
@@ -1462,8 +1881,10 @@ function renderProfStats() {
   const arelancer   = liste.filter(r => statutEtudiant(r) === "arelancer").length;
   const enCours     = liste.filter(r => statutEtudiant(r) === "encours").length;
   const pasCommence = liste.filter(r => statutEtudiant(r) === "pasco").length;
+  const accompagner = liste.filter(r => calcVerdict(r).niveau === "accompagner").length;
   document.getElementById("prof-stats").innerHTML = `
     <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-label">Étudiants</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--rouge)"><div class="stat-val" style="color:var(--rouge)">${accompagner}</div><div class="stat-label">🚩 À accompagner</div></div>
     <div class="stat-card" style="border-top:3px solid var(--gris2)"><div class="stat-val" style="color:var(--muted)">${pasCommence}</div><div class="stat-label">○ Pas commencé</div></div>
     <div class="stat-card" style="border-top:3px solid var(--orange)"><div class="stat-val" style="color:var(--orange)">${enCours}</div><div class="stat-label">⏳ En cours</div></div>
     <div class="stat-card" style="border-top:3px solid var(--rouge)"><div class="stat-val" style="color:var(--rouge)">${arelancer}</div><div class="stat-label">⚠ À faire valider</div></div>
@@ -1514,11 +1935,14 @@ function renderProfEtudiants() {
 
   if (rows.length === 0) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun résultat.</p>"; return; }
 
-  // Tri par priorité : à relancer d'abord, puis en cours, pas commencé, validé
-  const ordre = { arelancer: 0, encours: 1, pasco: 2, valide: 3 };
+  // Tri par priorité : à accompagner d'abord, puis à relancer, en cours, pas commencé, validé
+  const ordre = { arelancer: 1, encours: 2, pasco: 3, valide: 4 };
   rows.sort(([, a], [, b]) => {
-    const da = ordre[statutEtudiant(a)], db_ = ordre[statutEtudiant(b)];
-    if (da !== db_) return da - db_;
+    const va = calcVerdict(a), vb = calcVerdict(b);
+    const pa = (va.niveau === "accompagner") ? 0 : ordre[statutEtudiant(a)];
+    const pb = (vb.niveau === "accompagner") ? 0 : ordre[statutEtudiant(b)];
+    if (pa !== pb) return pa - pb;
+    if (pa === 0 && vb.nRouge !== va.nRouge) return vb.nRouge - va.nRouge; // plus de rouges en tête
     return `${a.meta.nom||""}`.localeCompare(`${b.meta.nom||""}`);
   });
 
@@ -1527,12 +1951,21 @@ function renderProfEtudiants() {
     const tests   = r.tests || {};
     const nbTests = Object.keys(tests).length;
     const st      = statutEtudiant(r);
+    const verdict = calcVerdict(r);
+    const aBesoin = verdict.niveau === "accompagner";
 
     // Ateliers restants (pour guider l'étudiant)
-    const restants = TESTS.filter(t => !tests[t.id]).map(t => t.nom);
+    const restants = TESTS.filter(t => tests[t.id] === undefined).map(t => t.nom);
     let resteHTML = "";
     if (st === "encours" && restants.length) {
       resteHTML = `<div class="reste-tags">À faire : ${restants.map(n => `<span class="reste-tag">${n}</span>`).join("")}</div>`;
+    }
+
+    let verdictHTML = "";
+    if (verdict.niveau !== "vide") {
+      const col = COULEURS[verdict.couleur];
+      verdictHTML = `<div style="margin-top:6px"><span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;background:${COULEUR_CLAIR[verdict.couleur]};color:${col.hex}">${col.emoji} ${verdict.titre}</span>
+        ${verdict.nRouge > 0 ? `<span style="font-size:11px;color:var(--rouge);margin-left:6px">${verdict.nRouge} test${verdict.nRouge>1?"s":""} en rouge</span>` : ""}</div>`;
     }
 
     let badge;
@@ -1542,13 +1975,15 @@ function renderProfEtudiants() {
     else                         badge = '<span class="badge-none">○ Pas commencé</span>';
 
     return `
-      <div class="student-row ${st === "arelancer" ? "attn" : ""}">
+      <div class="student-row ${aBesoin ? "attn" : (st === "arelancer" ? "attn" : "")}">
         <div>
-          <div class="student-name">${meta.prenom || ""} ${meta.nom || ""}</div>
+          <div class="student-name">${aBesoin ? "🚩 " : ""}${meta.prenom || ""} ${meta.nom || ""}</div>
           <div class="student-meta">
             <span class="filiere-tag">${meta.filiere || "—"}</span>
-            &nbsp;${nbTests}/${TESTS.length} ateliers
+            <span class="filiere-tag" style="background:var(--bleu-cl);color:var(--bleu)">${sexeLabel(meta.sexe)}</span>
+            &nbsp;${nbTests}/${TESTS.length} tests
           </div>
+          ${verdictHTML}
           ${resteHTML}
         </div>
         ${badge}
@@ -1560,18 +1995,15 @@ function renderProfEtudiants() {
 // ── ADMIN ─────────────────────────────────────────────────────
 async function initAdmin() {
   await chargerTests();
-  // Au tout premier lancement, /tests est vide : on l'initialise avec les
-  // tests par défaut pour que l'admin parte d'une base modifiable.
+  await chargerBaremes();
+  // Au tout premier lancement, /tests et /baremes sont vides : on initialise.
   try {
-    const snap = await get(ref(db, "tests"));
-    if (!snap.exists()) {
-      const seed = {};
-      DEFAULT_TESTS.forEach((t, i) => {
-        seed[t.id] = { nom: t.nom, desc: t.desc, unite: t.unite, placeholder: t.placeholder, ordre: i + 1 };
-      });
-      await set(ref(db, "tests"), seed);
-      await chargerTests();
-    }
+    const snapT = await get(ref(db, "tests"));
+    if (!snapT.exists()) { await seedTestsOfficiels(); }
+    const snapB = await get(ref(db, "baremes"));
+    if (!snapB.exists()) { await seedBaremesOfficiels(); }
+    await chargerTests();
+    await chargerBaremes();
   } catch (e) { /* droits insuffisants : on continue avec les défauts */ }
 
   renderAdminTests();
@@ -1628,21 +2060,44 @@ function renderAdminResultats() {
 
   if (!rows.length) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun résultat étudiant.</p>"; return; }
 
+  // À accompagner d'abord (plus de rouges en tête)
+  rows.sort(([, a], [, b]) => {
+    const va = calcVerdict(a), vb = calcVerdict(b);
+    const pa = va.niveau === "accompagner" ? 0 : 1, pb = vb.niveau === "accompagner" ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    if (pa === 0) return vb.nRouge - va.nRouge;
+    return `${a.meta?.nom||""}`.localeCompare(`${b.meta?.nom||""}`);
+  });
+
   container.innerHTML = `
     <table class="admin-table">
       <thead><tr>
         <th>Étudiant</th>
         <th>Filière</th>
-        ${TESTS.map(t => `<th>${t.id.toUpperCase()}</th>`).join("")}
+        <th>Sexe</th>
+        <th>Verdict</th>
+        ${TESTS.map(t => `<th title="${esc(t.nom)}">${esc(t.abbr || t.id.toUpperCase())}</th>`).join("")}
         <th>Statut</th>
         <th>Actions</th>
       </tr></thead>
       <tbody>
-        ${rows.map(([uid, r]) => `
-          <tr>
-            <td><strong style="font-size:13px">${r.meta?.prenom||""} ${(r.meta?.nom||"").toUpperCase()}</strong><br><span style="color:var(--muted);font-size:10px">${r.meta?.email||""}</span></td>
+        ${rows.map(([uid, r]) => {
+          const age = ageDepuis(r.meta?.anneeNaissance);
+          const verdict = calcVerdict(r);
+          const vCol = verdict.niveau !== "vide" ? COULEURS[verdict.couleur] : null;
+          return `
+          <tr ${verdict.niveau === "accompagner" ? 'style="background:'+COULEUR_CLAIR.rouge+'"' : ''}>
+            <td><strong style="font-size:13px">${verdict.niveau==="accompagner"?"🚩 ":""}${r.meta?.prenom||""} ${(r.meta?.nom||"").toUpperCase()}</strong><br><span style="color:var(--muted);font-size:10px">${r.meta?.email||""}</span></td>
             <td><span class="filiere-tag">${r.meta?.filiere||"—"}</span></td>
-            ${TESTS.map(t => `<td>${r.tests?.[t.id] !== undefined ? r.tests[t.id] + " " + t.unite : "—"}</td>`).join("")}
+            <td>${sexeCourt(r.meta?.sexe)}</td>
+            <td>${vCol ? `<span style="font-size:11px;font-weight:700;color:${vCol.hex}">${vCol.emoji} ${verdict.titre}${verdict.nRouge?` (${verdict.nRouge}🔴)`:""}</span>` : "—"}</td>
+            ${TESTS.map(t => {
+              const v = r.tests?.[t.id];
+              const c = couleurResultat(t, v, r.meta?.sexe, age);
+              const bg = c ? `background:${COULEUR_CLAIR[c]};color:${COULEURS[c].hex};font-weight:600` : "";
+              const aff = v === undefined ? "—" : (t.type === "choix" ? COULEURS[c]?.emoji || "•" : v);
+              return `<td style="${bg}" title="${esc(valeurLisible(t, v))}">${aff}</td>`;
+            }).join("")}
             <td>${r.meta?.valide
               ? `<span class="badge-ok">✓ Validé${r.meta?.validePar === 'admin' ? ' <span style="font-size:10px;opacity:0.7">(admin)</span>' : ''}</span>`
               : '<span class="badge-wait">⏳ Attente</span>'
@@ -1657,8 +2112,8 @@ function renderAdminResultats() {
                 <button class="btn btn-danger btn-sm" onclick="supprimerEtudiant('${uid}')" title="Supprimer">🗑️</button>
               </div>
             </td>
-          </tr>
-        `).join("")}
+          </tr>`;
+        }).join("")}
       </tbody>
     </table>
   `;
@@ -1672,7 +2127,7 @@ function renderAdminUsers() {
   container.innerHTML = `
     <table class="admin-table">
       <thead><tr>
-        <th>Nom</th><th>Email</th><th>Rôle</th><th>Filière</th><th>Action</th>
+        <th>Nom</th><th>Email</th><th>Rôle</th><th>Filière</th><th>Sexe</th><th>Action</th>
       </tr></thead>
       <tbody>
         ${rows.map(([uid, u]) => `
@@ -1699,6 +2154,13 @@ function renderAdminUsers() {
                 <option value="Autre"          ${u.filiere==="Autre"         ?"selected":""}>Autre filière</option>
               </select>
             </td>
+            <td>
+              <select onchange="changerSexe('${uid}', this.value)" style="width:auto;margin:0;padding:4px 8px;font-size:12px;border-radius:6px;border:1.5px solid var(--gris2)">
+                <option value=""  ${!u.sexe||u.sexe===""?"selected":""}>—</option>
+                <option value="F" ${u.sexe==="F"?"selected":""}>Femme</option>
+                <option value="H" ${u.sexe==="H"?"selected":""}>Homme</option>
+              </select>
+            </td>
             <td><span style="font-size:11px;color:var(--muted)">${new Date(u.createdAt||0).toLocaleDateString("fr-FR")}</span></td>
           </tr>
         `).join("")}
@@ -1715,19 +2177,23 @@ function renderAdminTests() {
   c.innerHTML = `
     <table class="admin-table">
       <thead><tr>
-        <th>Code</th><th>Titre</th><th>Description</th><th>Unité</th><th>Exemple</th><th>Actions</th>
+        <th>Code</th><th>Titre</th><th>Famille</th><th>Unité</th><th>Barème</th><th>Actions</th>
       </tr></thead>
       <tbody>
         ${TESTS.map(t => `
           <tr>
-            <td><strong>${esc(t.id.toUpperCase())}</strong></td>
-            <td style="white-space:normal;min-width:140px"><input id="et-nom-${t.id}"   value="${esc(t.nom)}"         style="${champ}"></td>
-            <td style="white-space:normal;min-width:180px"><input id="et-desc-${t.id}"  value="${esc(t.desc)}"        style="${champ}"></td>
+            <td><strong>${esc(t.abbr || t.id.toUpperCase())}</strong></td>
+            <td style="white-space:normal;min-width:150px"><input id="et-nom-${t.id}" value="${esc(t.nom)}" style="${champ}"></td>
+            <td><span class="filiere-tag">${esc(t.categorie||"—")}</span></td>
             <td><input id="et-unite-${t.id}" value="${esc(t.unite)}" style="${champ};width:70px"></td>
-            <td><input id="et-ph-${t.id}"    value="${esc(t.placeholder)}" style="${champ};width:90px"></td>
+            <td>
+              ${BAREMES[t.code]
+                ? `<button class="btn btn-outline btn-sm" onclick="ouvrirBareme('${t.code}')" title="Modifier les seuils et couleurs">⚙️ Seuils</button>`
+                : `<span style="font-size:11px;color:var(--muted)">aucun</span>`}
+            </td>
             <td>
               <div class="actions">
-                <button class="btn btn-sm" style="background:var(--vert);color:white;padding:5px 9px;font-size:12px" onclick="adminModifierTest('${t.id}')" title="Enregistrer les modifications">💾</button>
+                <button class="btn btn-sm" style="background:var(--vert);color:white;padding:5px 9px;font-size:12px" onclick="adminModifierTest('${t.id}')" title="Enregistrer le titre / l'unité">💾</button>
                 <button class="btn btn-danger btn-sm" onclick="adminSupprimerTest('${t.id}')" title="Supprimer ce test">🗑️</button>
               </div>
             </td>
@@ -1735,21 +2201,44 @@ function renderAdminTests() {
       </tbody>
     </table>
 
-    <div class="card" style="margin-top:16px;background:var(--gris);border-left:3px solid var(--vert)">
-      <h4 style="margin-bottom:12px">➕ Ajouter un test</h4>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">
-        <div><label style="font-size:12px;font-weight:600">Titre *</label><input id="new-nom"   placeholder="ex : Test de Ruffier" style="margin:4px 0 0;padding:8px"></div>
-        <div><label style="font-size:12px;font-weight:600">Description</label><input id="new-desc" placeholder="ex : Récupération cardiaque" style="margin:4px 0 0;padding:8px"></div>
-        <div><label style="font-size:12px;font-weight:600">Unité</label><input id="new-unite"   placeholder="ex : bpm" style="margin:4px 0 0;padding:8px"></div>
-        <div><label style="font-size:12px;font-weight:600">Exemple</label><input id="new-ph"     placeholder="ex : 12" style="margin:4px 0 0;padding:8px"></div>
-      </div>
-      <button class="btn btn-primary" style="width:auto;padding:9px 18px" onclick="adminAjouterTest()">Ajouter le test</button>
+    <div class="card" style="margin-top:16px;background:var(--or-cl);border-left:3px solid var(--orange)">
+      <h4 style="margin-bottom:6px">↺ Réinitialiser le bilan officiel</h4>
+      <p style="font-size:13px;color:#7c4a00;margin-bottom:12px">
+        Réinstalle les <strong>13 tests</strong> et tous les <strong>barèmes officiels</strong> par défaut.
+        N'efface pas les résultats déjà saisis.
+      </p>
+      <button class="btn" style="width:auto;padding:9px 18px;background:var(--orange);color:#fff" onclick="adminReinitOfficiel()">Réinstaller tests + barèmes</button>
+    </div>
+
+    <div class="card" style="margin-top:12px;background:var(--rouge-cl);border-left:3px solid var(--rouge)">
+      <h4 style="margin-bottom:6px">🗑️ Effacer tous les résultats étudiants</h4>
+      <p style="font-size:13px;color:#7a1f17;margin-bottom:12px">
+        Supprime définitivement les bilans saisis par tous les étudiants (à utiliser après la phase de mise en place).
+        Les comptes ne sont pas supprimés.
+      </p>
+      <button class="btn btn-danger" style="width:auto;padding:9px 18px" onclick="adminEffacerResultats()">Effacer tous les résultats</button>
     </div>
   `;
 }
 
+// Réinstallation officielle ───────────────────────────────────
+async function seedTestsOfficiels() {
+  const seed = {};
+  DEFAULT_TESTS.forEach(t => {
+    seed[t.id] = {
+      code:t.code, abbr:t.abbr, nom:t.nom, desc:t.desc, categorie:t.categorie,
+      type:t.type, sensInverse:!!t.sensInverse, unite:t.unite, placeholder:t.placeholder, ordre:t.ordre
+    };
+  });
+  await set(ref(db, "tests"), seed);
+}
+async function seedBaremesOfficiels() {
+  await set(ref(db, "baremes"), JSON.parse(JSON.stringify(DEFAULT_BAREMES)));
+}
+
 async function rafraichirApresTest() {
   await chargerTests();
+  await chargerBaremes();
   renderAdminTests();
   renderAdminResultats();
 }
@@ -1759,13 +2248,7 @@ window.adminModifierTest = async function(id) {
   if (!nom) { alert("Le titre du test est obligatoire."); return; }
   const t = TESTS.find(x => x.id === id) || {};
   try {
-    await update(ref(db, `tests/${id}`), {
-      nom,
-      desc: val("et-desc-" + id).trim(),
-      unite: val("et-unite-" + id).trim(),
-      placeholder: val("et-ph-" + id).trim() || "ex : …",
-      ordre: t.ordre ?? 99
-    });
+    await update(ref(db, `tests/${id}`), { nom, unite: val("et-unite-" + id).trim() });
     await rafraichirApresTest();
   } catch (e) { alert("Erreur : " + e.message); }
 };
@@ -1780,19 +2263,125 @@ window.adminSupprimerTest = async function(id) {
   } catch (e) { alert("Erreur : " + e.message); }
 };
 
-window.adminAjouterTest = async function() {
-  const nom = val("new-nom").trim();
-  if (!nom) { alert("Le titre du test est obligatoire."); return; }
-  const id = genTestId();
+window.adminReinitOfficiel = async function() {
+  if (!confirm("Réinstaller les 13 tests et les barèmes officiels par défaut ?\n\nLes résultats déjà saisis ne sont pas effacés.")) return;
   try {
-    await set(ref(db, `tests/${id}`), {
-      nom,
-      desc: val("new-desc").trim(),
-      unite: val("new-unite").trim(),
-      placeholder: val("new-ph").trim() || "ex : …",
-      ordre: TESTS.length + 1
-    });
+    await seedTestsOfficiels();
+    await seedBaremesOfficiels();
     await rafraichirApresTest();
+    alert("Bilan officiel réinstallé : 13 tests + barèmes.");
+  } catch (e) { alert("Erreur : " + e.message); }
+};
+
+window.adminEffacerResultats = async function() {
+  if (!confirm("Effacer DÉFINITIVEMENT tous les résultats de tous les étudiants ?\n\nCette action est irréversible. Les comptes ne sont pas supprimés.")) return;
+  if (!confirm("Confirmer une dernière fois : tous les bilans seront perdus.")) return;
+  try {
+    // On efface les tests/meta de résultats mais on garde meta d'identité ? Simplicité : on remet meta à zéro côté valeurs.
+    const snap = await get(ref(db, "resultats"));
+    if (snap.exists()) {
+      const updates = {};
+      Object.keys(snap.val()).forEach(uid => {
+        updates[`resultats/${uid}/tests`] = null;
+        updates[`resultats/${uid}/ricci`] = null;
+        updates[`resultats/${uid}/meta/valide`] = false;
+        updates[`resultats/${uid}/meta/validatedAt`] = null;
+        updates[`resultats/${uid}/meta/poids`] = null;
+        updates[`resultats/${uid}/meta/taille`] = null;
+      });
+      await update(ref(db), updates);
+    }
+    alert("Tous les résultats ont été effacés.");
+  } catch (e) { alert("Erreur : " + e.message); }
+};
+
+// ── Éditeur de barèmes (modale générée dynamiquement) ─────────
+function ouvrirBareme(code) {
+  const t = TESTS.find(x => x.code === code) || {};
+  const b = BAREMES[code];
+  if (!b) return;
+  document.getElementById("modal-bareme")?.remove();
+  const sensTxt = b.sens === "bas" ? "valeur basse = meilleur (🔵)" : "valeur haute = meilleur (🔵)";
+  let corps = "";
+
+  if (b.kind === "universel") {
+    corps = `
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">${sensTxt} — 4 seuils → 5 couleurs (🔴 🟠 🟡 🟢 🔵)</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        ${b.seuils.map((s,i)=>`<input type="number" step="any" id="bar_${code}_u_${i}" value="${s}" style="width:80px;padding:7px;margin:0">`).join('<span style="color:var(--muted)">‹</span>')}
+      </div>`;
+  } else if (b.kind === "ageSexe") {
+    const tranches = Object.keys(b.tranches);
+    corps = `
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">${sensTxt} — 4 seuils par tranche d'âge et par sexe</p>
+      <div style="overflow-x:auto"><table class="admin-table" style="min-width:520px"><thead><tr>
+        <th>Tranche</th><th>Sexe</th><th>🔴/🟠</th><th>🟠/🟡</th><th>🟡/🟢</th><th>🟢/🔵</th></tr></thead><tbody>
+        ${tranches.map((tr,ti)=>["F","H"].map(S=>`
+          <tr>
+            <td><strong>${esc(tr)}</strong></td><td>${S}</td>
+            ${b.tranches[tr][S].map((s,i)=>`<td><input type="number" step="any" id="bar_${code}_${ti}_${S}_${i}" value="${s}" style="width:64px;padding:5px;margin:0"></td>`).join("")}
+          </tr>`).join("")).join("")}
+      </tbody></table></div>`;
+  } else if (b.kind === "imc") {
+    const labels = ["Insuffisance pondérale","Corpulence normale","Surpoids","Obésité grade 1","Obésité grade 2"];
+    corps = `
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Bornes hautes de chaque catégorie d'IMC (kg/m²)</p>
+      ${b.bandes.slice(0,5).map((bd,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${COULEURS[bd.couleur].hex}"></span>
+          <span style="font-size:13px;flex:1">${labels[i]} &lt;</span>
+          <input type="number" step="any" id="barimc_${i}" value="${bd.max}" style="width:80px;padding:6px;margin:0">
+        </div>`).join("")}`;
+  } else if (b.kind === "choix") {
+    const cols = ["rouge","orange","jaune","vert","bleu"];
+    corps = `
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Couleur attribuée à chaque position</p>
+      ${b.options.map((o,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:13px;flex:1">${esc(o.label)}</span>
+          <select id="barch_${i}" style="width:auto;padding:6px;margin:0">
+            ${cols.map(co=>`<option value="${co}" ${o.couleur===co?"selected":""}>${COULEURS[co].emoji} ${COULEURS[co].label}</option>`).join("")}
+          </select>
+        </div>`).join("")}`;
+  }
+
+  const m = document.createElement("div");
+  m.id = "modal-bareme";
+  m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px";
+  m.innerHTML = `
+    <div style="background:#fff;border-radius:12px;max-width:640px;width:100%;max-height:88vh;overflow:auto;padding:22px">
+      <h3 style="margin-bottom:4px">⚙️ Barème — ${esc(t.nom||code)}</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Les modifications s'appliquent à tous les calculs de couleur dès l'enregistrement.</p>
+      ${corps}
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+        <button class="btn btn-outline" style="width:auto;padding:9px 18px" onclick="document.getElementById('modal-bareme').remove()">Annuler</button>
+        <button class="btn btn-primary" style="width:auto;padding:9px 18px" onclick="sauverBareme('${code}')">Enregistrer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+}
+window.ouvrirBareme = ouvrirBareme;
+
+window.sauverBareme = async function(code) {
+  const b = JSON.parse(JSON.stringify(BAREMES[code]));
+  const num = id => parseFloat(document.getElementById(id).value);
+  try {
+    if (b.kind === "universel") {
+      b.seuils = b.seuils.map((_,i)=>num(`bar_${code}_u_${i}`));
+    } else if (b.kind === "ageSexe") {
+      Object.keys(b.tranches).forEach((tr,ti)=>["F","H"].forEach(S=>{
+        b.tranches[tr][S] = b.tranches[tr][S].map((_,i)=>num(`bar_${code}_${ti}_${S}_${i}`));
+      }));
+    } else if (b.kind === "imc") {
+      b.bandes.slice(0,5).forEach((bd,i)=>{ bd.max = num(`barimc_${i}`); });
+    } else if (b.kind === "choix") {
+      b.options.forEach((o,i)=>{ o.couleur = document.getElementById(`barch_${i}`).value; });
+    }
+    await set(ref(db, `baremes/${code}`), b);
+    BAREMES[code] = b;
+    document.getElementById("modal-bareme")?.remove();
+    renderAdminResultats();
+    alert("Barème enregistré.");
   } catch (e) { alert("Erreur : " + e.message); }
 };
 
@@ -1806,6 +2395,13 @@ async function changerFiliere(uid, newFiliere) {
   await update(ref(db, `resultats/${uid}/meta`), { filiere: newFiliere });
 }
 window.changerFiliere = changerFiliere;
+
+async function changerSexe(uid, newSexe) {
+  // Mettre à jour dans users ET dans resultats/meta pour cohérence
+  await update(ref(db, `users/${uid}`), { sexe: newSexe });
+  await update(ref(db, `resultats/${uid}/meta`), { sexe: newSexe });
+}
+window.changerSexe = changerSexe;
 
 async function supprimerEtudiant(uid) {
   // Récupérer le nom pour confirmation
@@ -1859,12 +2455,26 @@ function ouvrirEdit(uid) {
   editUID = uid;
   const r = allResultats[uid] || {};
   const fields = document.getElementById("modal-fields");
-  fields.innerHTML = TESTS.map(t => `
-    <div class="form-group">
-      <label>${t.nom} (${t.unite})</label>
-      <input type="number" id="edit-${t.id}" value="${r.tests?.[t.id] ?? ""}" placeholder="${t.placeholder}" step="any" min="0" style="margin-bottom:10px">
-    </div>
-  `).join("");
+  fields.innerHTML = TESTS.map(t => {
+    const v = r.tests?.[t.id];
+    if (t.type === "choix") {
+      const b = BAREMES[t.code] || { options: [] };
+      return `
+        <div class="form-group">
+          <label>${esc(t.nom)}</label>
+          <select id="edit-${t.id}" data-type="choix" style="margin-bottom:10px">
+            <option value="">— Non renseigné —</option>
+            ${b.options.map(o => `<option value="${o.cle}" ${v === o.cle ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
+          </select>
+        </div>`;
+    }
+    const lbl = t.type === "ricci" ? "score /45" : (t.type === "imc" ? "kg/m²" : t.unite);
+    return `
+      <div class="form-group">
+        <label>${esc(t.nom)} (${esc(lbl)})</label>
+        <input type="number" id="edit-${t.id}" data-type="num" value="${v ?? ""}" placeholder="${esc(t.placeholder)}" step="any" min="0" style="margin-bottom:10px">
+      </div>`;
+  }).join("");
   document.getElementById("modal-edit").classList.add("open");
 }
 
@@ -1872,8 +2482,14 @@ async function saveEdit() {
   if (!editUID) return;
   const updates = {};
   TESTS.forEach(t => {
-    const val = document.getElementById(`edit-${t.id}`)?.value;
-    if (val !== "") updates[`resultats/${editUID}/tests/${t.id}`] = parseFloat(val);
+    const el = document.getElementById(`edit-${t.id}`);
+    if (!el) return;
+    const raw = el.value;
+    if (el.dataset.type === "choix") {
+      updates[`resultats/${editUID}/tests/${t.id}`] = raw === "" ? null : raw;
+    } else if (raw !== "") {
+      updates[`resultats/${editUID}/tests/${t.id}`] = parseFloat(raw);
+    }
   });
   await update(ref(db), updates);
   closeModal();
