@@ -301,6 +301,43 @@
   .test-unite { font-size: 13px; color: var(--muted); min-width: 34px; }
   .test-saved { font-size: 11px; color: var(--vert); font-weight: 600; margin-top: 6px; display: none; }
 
+  /* ===== MES RÉSULTATS — tableau de bord ===== */
+  .verdict-card { border-radius: 14px; padding: 18px 16px; display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+  .verdict-card .vc-ic { width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 24px; background: #fff; }
+  .verdict-card h2 { font-size: 18px; margin-bottom: 4px; }
+  .verdict-card p { font-size: 13px; line-height: 1.5; color: #3a3a3a; }
+  .legende { display: flex; gap: 6px; margin-bottom: 18px; }
+  .legende .lg { flex: 1; text-align: center; border-radius: 9px; padding: 7px 0; font-size: 13px; font-weight: 800; }
+  .legende .lg small { display: block; font-size: 10px; font-weight: 600; opacity: .85; }
+  .resfam { margin-bottom: 9px; border: 1px solid var(--gris2); border-radius: 11px; overflow: hidden; background: #fff; }
+  .resfam-head { width: 100%; display: flex; align-items: center; gap: 9px; padding: 12px 13px; background: #fff; border: none; cursor: pointer; text-align: left; font-family: inherit; }
+  .resfam-head .rf-bar { width: 5px; height: 16px; border-radius: 3px; background: var(--bleu); flex-shrink: 0; }
+  .resfam-head .rf-name { font-size: 12.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--bleu); }
+  .resfam-head .rf-dots { display: flex; gap: 4px; margin-left: auto; }
+  .resfam-head .rf-dots span { width: 11px; height: 11px; border-radius: 50%; }
+  .resfam-head .rf-chev { font-size: 11px; color: var(--muted); transition: transform .2s; flex-shrink: 0; }
+  .resfam.open .rf-chev { transform: rotate(180deg); }
+  .resfam-body { display: none; padding: 0 11px 11px; }
+  .resfam.open .resfam-body { display: block; }
+  .rrow { display: flex; align-items: center; gap: 11px; border-left: 4px solid var(--gris2); background: var(--gris); border-radius: 7px; padding: 10px 12px; margin-top: 7px; }
+  .rrow .rdot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; }
+  .rrow .rname { flex: 1; font-size: 13.5px; font-weight: 600; line-height: 1.2; }
+  .rrow .rval { font-size: 14px; font-weight: 800; white-space: nowrap; }
+
+  /* ===== ESPACE PROF — cartes étudiant ===== */
+  .scard { background:#fff; border:1px solid var(--gris2); border-radius:12px; padding:13px 14px; margin-bottom:11px; }
+  .scard.attn { background:var(--rouge-cl); border-left:5px solid var(--rouge); }
+  .scard .shead { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .scard .smeta-row { margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
+  .scard .prog { font-size:12px; color:var(--muted); margin-top:9px; }
+  .scard .prog b { color:var(--texte); }
+  .vbadge { font-size:11px; font-weight:800; padding:3px 10px; border-radius:20px; white-space:nowrap; }
+  .btn-full { display:block; width:100%; text-align:center; padding:11px; border-radius:10px; font-size:14px; font-weight:800; margin-top:11px; border:none; cursor:pointer; font-family:inherit; }
+  .btn-full.val { background:var(--vert); color:#fff; }
+  .btn-full.dev { background:var(--or-cl); color:var(--orange); border:1.5px solid var(--orange); font-weight:700; }
+  .statusline { display:flex; align-items:center; gap:7px; margin-top:10px; font-size:11px; color:var(--muted); }
+  .statusline .dotsmall { width:9px; height:9px; border-radius:50%; }
+
   /* ===== RÉSULTATS PERSO ===== */
   .result-row {
     display: flex;
@@ -673,7 +710,7 @@
     <div class="card">
       <h3>📋 Tests du bilan sport santé</h3>
       <div class="msg info visible" id="saisie-info">
-        Saisissez vos résultats au fur et à mesure des tests. Chaque test est sauvegardé individuellement.
+        Saisis tes résultats au fur et à mesure des tests. Chaque test est enregistré automatiquement.
       </div>
       <div id="tests-container"></div>
       <div class="divider"></div>
@@ -1283,9 +1320,9 @@ function calcVerdict(r) {
   else if (bon >= moyen && bon >= aRevoir) niveau = "forme";
   else niveau = "moyen";
   const MESSAGES = {
-    accompagner: { titre:"À accompagner", txt:"Pas de panique ! Nous vous conseillons de rencontrer un professionnel de l'activité physique qui saura vous proposer des exercices adaptés. N'hésitez pas à lui montrer vos résultats." , couleur:"rouge" },
-    moyen:       { titre:"Peut mieux faire", txt:"C'est bien, mais vous pouvez sans doute faire un peu plus, un peu plus longtemps. Trouvez l'activité physique qui vous fait plaisir." , couleur:"jaune" },
-    forme:       { titre:"En bonne forme", txt:"Félicitations ! Vous êtes en bonne forme physique. Pensez à vous entretenir régulièrement." , couleur:"vert" },
+    accompagner: { titre:"À accompagner", txt:"Pas de panique ! On te conseille de rencontrer un encadrant du SUAPS, qui te proposera des exercices adaptés. Montre-lui tes résultats, c'est fait pour ça." , couleur:"rouge" },
+    moyen:       { titre:"Peut mieux faire", txt:"C'est bien, mais tu peux sans doute faire un peu plus, un peu plus longtemps. Trouve l'activité physique qui te plaît." , couleur:"jaune" },
+    forme:       { titre:"En bonne forme", txt:"Félicitations, tu es en bonne forme physique ! Pense à t'entretenir régulièrement." , couleur:"vert" },
   };
   return { niveau, ...MESSAGES[niveau], nRouge, total, parCouleur };
 }
@@ -1632,7 +1669,7 @@ function blocTest(uid, t, meta, valeurs) {
 
 // Libellés des familles affichés en tête de section
 const CAT_LABELS = {
-  "IMC": "Corpulence", "Activité": "Activité physique", "Endurance": "Endurance",
+  "IMC": "IMC", "Activité": "Activité physique", "Endurance": "Endurance",
   "Force": "Force musculaire", "Équilibre": "Équilibre", "Souplesse": "Souplesse"
 };
 
@@ -1831,48 +1868,7 @@ window.fermerSucces = function() {
   document.getElementById("succes-overlay").classList.remove("open");
 };
 
-function chargerMesResultats(uid) {
-  onValue(ref(db, `resultats/${uid}`), snap => {
-    const container = document.getElementById("mes-resultats-container");
-    if (!snap.exists()) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun résultat enregistré.</p>"; return; }
-    const data  = snap.val();
-    const tests = data.tests || {};
-    const meta  = data.meta  || {};
-    const age   = ageDepuis(meta.anneeNaissance);
-    const verdict = calcVerdict(data);
 
-    let verdictHTML = "";
-    if (verdict.niveau !== "vide") {
-      const col = COULEURS[verdict.couleur];
-      verdictHTML = `
-        <div style="border-radius:10px;padding:16px;margin-bottom:16px;background:${COULEUR_CLAIR[verdict.couleur]};border-left:5px solid ${col.hex}">
-          <div style="font-weight:700;font-size:16px;color:${col.hex};margin-bottom:4px">${col.emoji} ${verdict.titre}</div>
-          <div style="font-size:13px;color:#333">${verdict.txt}</div>
-        </div>`;
-    }
-
-    container.innerHTML = `
-      <div style="margin-bottom:12px">
-        <span class="filiere-tag">${meta.filiere || "—"}</span>
-        ${meta.sexe ? `<span class="filiere-tag" style="background:var(--bleu-cl);color:var(--bleu)">${sexeLabel(meta.sexe)}</span>` : ""}
-        <span style="font-size:12px;color:var(--muted);margin-left:8px">Session ${meta.session || "—"}</span>
-        ${meta.valide ? '<span class="badge-ok" style="margin-left:8px">✓ Validé</span>' : '<span class="badge-wait" style="margin-left:8px">En cours</span>'}
-      </div>
-      ${verdictHTML}
-      ${TESTS.map(t => {
-        const c = couleurResultat(t, tests[t.id], meta.sexe, age);
-        const pastille = c
-          ? `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${COULEURS[c].hex};margin-right:8px;vertical-align:middle"></span>`
-          : `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid var(--gris2);margin-right:8px;vertical-align:middle"></span>`;
-        return `
-        <div class="result-row">
-          <span class="result-nom">${pastille}${esc(t.nom)}</span>
-          <div><span class="result-val">${esc(valeurLisible(t, tests[t.id]))}</span></div>
-        </div>`;
-      }).join("")}
-    `;
-  });
-}
 
 // ── PROF ─────────────────────────────────────────────────────
 async function initProf() {
@@ -1992,43 +1988,50 @@ function renderProfEtudiants() {
       resteHTML = `<div class="reste-tags">À faire : ${restants.map(n => `<span class="reste-tag">${n}</span>`).join("")}</div>`;
     }
 
-    let verdictHTML = "";
+    // Badge en haut à droite : verdict si dispo, sinon statut d'avancement
+    let badge;
     if (verdict.niveau !== "vide") {
       const col = COULEURS[verdict.couleur];
-      verdictHTML = `<div style="margin-top:6px"><span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;background:${COULEUR_CLAIR[verdict.couleur]};color:${col.hex}">${col.emoji} ${verdict.titre}</span>
-        ${verdict.nRouge > 0 ? `<span style="font-size:11px;color:var(--rouge);margin-left:6px">${verdict.nRouge} test${verdict.nRouge>1?"s":""} en rouge</span>` : ""}</div>`;
+      badge = `<span class="vbadge" style="background:${COULEUR_CLAIR[verdict.couleur]};color:${col.hex}">${col.emoji} ${verdict.titre}</span>`;
+    } else if (st === "encours") {
+      badge = `<span class="vbadge" style="background:var(--or-cl);color:var(--orange)">⏳ En cours</span>`;
+    } else {
+      badge = `<span class="vbadge" style="background:var(--gris);color:var(--muted)">○ Pas commencé</span>`;
     }
 
-    let badge;
-    if (st === "valide")         badge = '<span class="badge-ok">✓ Validé</span>';
-    else if (st === "arelancer") badge = '<span class="badge-relance">⚠ À faire valider</span>';
-    else if (st === "encours")   badge = '<span class="badge-wait">⏳ En cours</span>';
-    else                         badge = '<span class="badge-none">○ Pas commencé</span>';
+    // Ligne d'avancement
+    let prog;
+    if (nbTests === 0)               prog = `Pas encore commencé`;
+    else if (nbTests < TESTS.length) prog = `Saisie partielle · <b>${nbTests}/${TESTS.length} tests</b>`;
+    else                             prog = `Bilan complet · <b>${TESTS.length}/${TESTS.length} tests</b>`;
+    if (verdict.nRouge > 0)          prog += ` · <span style="color:var(--rouge)">${verdict.nRouge} en rouge</span>`;
 
-    const valePar = meta.valide && meta.valideParNom ? `<div style="font-size:10px;color:var(--muted);margin-top:3px">par ${esc(meta.valideParNom)}</div>` : "";
-    let action = "";
+    // Action / statut de validation
+    let bas = "";
     if (meta.valide) {
-      action = `<button class="btn btn-sm" style="background:var(--or-cl);color:var(--orange);border:1px solid var(--orange);padding:5px 11px;font-size:12px;width:auto" onclick="profDevalider('${uid}')" title="Annuler la validation">↩ Dévalider</button>`;
+      const quand = meta.validatedAt ? new Date(meta.validatedAt).toLocaleDateString("fr-FR", {day:"2-digit",month:"2-digit"}) : "";
+      bas = `
+        <div class="statusline"><span class="dotsmall" style="background:var(--vert)"></span> Validé${meta.valideParNom ? " par " + esc(meta.valideParNom) : ""}${quand ? " · " + quand : ""}</div>
+        <button class="btn-full dev" onclick="profDevalider('${uid}')">↩ Dévalider</button>`;
     } else if (nbTests > 0) {
-      action = `<button class="btn btn-sm" style="background:var(--vert);color:#fff;padding:5px 13px;font-size:12px;width:auto" onclick="profValider('${uid}')" title="Valider le bilan de l'étudiant">✓ Valider</button>`;
+      bas = `<button class="btn-full val" onclick="profValider('${uid}')">✓ Valider le bilan</button>`;
     }
 
     return `
-      <div class="student-row ${aBesoin ? "attn" : (st === "arelancer" ? "attn" : "")}">
-        <div>
-          <div class="student-name">${aBesoin ? "🚩 " : ""}${meta.prenom || ""} ${meta.nom || ""}</div>
-          <div class="student-meta">
-            <span class="filiere-tag">${meta.filiere || "—"}</span>
-            <span class="filiere-tag" style="background:var(--bleu-cl);color:var(--bleu)">${sexeLabel(meta.sexe)}</span>
-            &nbsp;${nbTests}/${TESTS.length} tests
+      <div class="scard ${aBesoin ? "attn" : ""}">
+        <div class="shead">
+          <div>
+            <div class="student-name">${aBesoin ? "🚩 " : ""}${esc(meta.prenom || "")} ${esc(meta.nom || "")}</div>
+            <div class="smeta-row">
+              <span class="filiere-tag">${meta.filiere || "—"}</span>
+              <span class="filiere-tag" style="background:var(--bleu-cl);color:var(--bleu)">${sexeLabel(meta.sexe)}</span>
+            </div>
           </div>
-          ${verdictHTML}
-          ${resteHTML}
+          ${badge}
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-          ${badge}${valePar}
-          ${action}
-        </div>
+        <div class="prog">${prog}</div>
+        ${resteHTML}
+        ${bas}
       </div>
     `;
   }).join("");
