@@ -263,57 +263,43 @@
   }
 
   /* ===== TEST SAISIE ===== */
-  #tests-container {
+  /* ===== SAISIE DES TESTS — tableau de bord ===== */
+  #tests-container { margin-bottom: 4px; }
+  .cat-block { margin-bottom: 22px; }
+  .cat-title {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--bleu); margin: 2px 0 11px;
+  }
+  .cat-title .cat-bar { width: 5px; height: 16px; border-radius: 3px; background: var(--bleu); flex-shrink: 0; }
+  .cat-title .cat-count {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: none; letter-spacing: 0;
+  }
+  .cat-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 14px;
-    margin-bottom: 4px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
   }
   .test-item {
-    background: var(--gris);
-    border-radius: 12px;
-    padding: 16px;
-    border-top: 4px solid var(--bleu);
-    box-shadow: 0 1px 5px rgba(0,0,0,0.06);
+    background: #fff;
+    border: 1px solid var(--gris2);
+    border-left: 5px solid var(--gris2);
+    border-radius: 10px;
+    padding: 13px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     display: flex;
     flex-direction: column;
+    transition: border-left-color .2s ease;
   }
-  .test-item .test-nom {
-    font-weight: 700;
-    font-size: 15px;
-    line-height: 1.25;
-    margin-bottom: 6px;
-    color: var(--bleu);
-  }
-  .test-item .test-desc {
-    font-size: 12px;
-    color: var(--muted);
-    margin-bottom: 12px;
-    flex: 1;
-  }
-  .test-input-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-  .test-input-row input {
-    flex: 1;
-    margin-bottom: 0;
-    font-size: 16px;
-    font-weight: 600;
-  }
-  .test-unite {
-    font-size: 13px;
-    color: var(--muted);
-    min-width: 40px;
-  }
-  .test-saved {
-    font-size: 12px;
-    color: var(--vert);
-    font-weight: 600;
-    margin-top: 5px;
-    display: none;
-  }
+  .test-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .test-item .test-nom { font-weight: 700; font-size: 14px; line-height: 1.2; color: var(--texte); }
+  .test-item .test-desc { font-size: 11.5px; color: var(--muted); margin: 3px 0 0; line-height: 1.3; }
+  .test-dot { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--gris2); background: transparent; flex-shrink: 0; margin-top: 2px; }
+  .test-input-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .test-input-row input, .test-input-row select { flex: 1; margin-bottom: 0; font-size: 16px; font-weight: 600; }
+  .test-unite { font-size: 13px; color: var(--muted); min-width: 34px; }
+  .test-saved { font-size: 11px; color: var(--vert); font-weight: 600; margin-top: 6px; display: none; }
 
   /* ===== RÉSULTATS PERSO ===== */
   .result-row {
@@ -528,6 +514,19 @@
     .card { padding: 14px; }
     .admin-table { font-size: 11px; }
     .admin-table th, .admin-table td { padding: 7px 6px; }
+  }
+
+  /* ===== MOBILE — étudiants + enseignants sur téléphone ===== */
+  @media (max-width: 600px) {
+    .content { padding: 14px 11px; }
+    .card { padding: 15px 13px; }
+    .cat-grid { grid-template-columns: 1fr; }          /* une carte par ligne */
+    .cat-block { margin-bottom: 18px; }
+    .student-row { flex-wrap: wrap; gap: 8px; }
+    .header-logo { font-size: 16px; }
+    /* tableaux admin : défilement horizontal au lieu de déborder */
+    #admin-resultats-container, #admin-tests-container, #admin-users-container,
+    #historique-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   }
 </style>
 </head>
@@ -1571,14 +1570,17 @@ async function initEtudiant(uid, userData) {
 let monSexe = null, monAge = null;
 
 function pastilleHTML(id) {
-  return `<span id="dot-${id}" style="display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid var(--gris2);background:transparent;flex-shrink:0" title=""></span>`;
+  return `<span id="dot-${id}" class="test-dot" title=""></span>`;
 }
 function majPastille(t, valeur) {
-  const dot = document.getElementById(`dot-${t.id}`);
-  if (!dot) return;
+  const dot  = document.getElementById(`dot-${t.id}`);
+  const card = document.getElementById(`card-${t.id}`);
   const c = couleurResultat(t, valeur, monSexe, monAge);
-  if (c) { dot.style.background = COULEURS[c].hex; dot.style.borderColor = COULEURS[c].hex; dot.title = COULEURS[c].label; }
-  else   { dot.style.background = "transparent"; dot.style.borderColor = "var(--gris2)"; dot.title = ""; }
+  if (dot) {
+    if (c) { dot.style.background = COULEURS[c].hex; dot.style.borderColor = COULEURS[c].hex; dot.title = COULEURS[c].label; }
+    else   { dot.style.background = "transparent"; dot.style.borderColor = "#e0e0e0"; dot.title = ""; }
+  }
+  if (card) card.style.borderLeftColor = c ? COULEURS[c].hex : "#e0e0e0";
 }
 function blinkSaved(id) {
   const el = document.getElementById(`saved-${id}`);
@@ -1588,45 +1590,51 @@ function blinkSaved(id) {
 function blocTest(uid, t, meta, valeurs) {
   const v = valeurs[t.id];
   const tete = `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+    <div class="test-head">
       <div><div class="test-nom">${esc(t.nom)}</div><div class="test-desc">${esc(t.desc)}</div></div>
       ${pastilleHTML(t.id)}
     </div>`;
   let corps = "";
   if (t.type === "imc") {
     corps = `
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:8px">
-        <div><label style="font-size:12px;color:var(--muted)">Poids (kg)</label>
-          <input type="number" id="imc-poids" value="${meta.poids ?? ""}" placeholder="ex : 65" step="any" min="0" onchange="saveIMC('${uid}')" style="margin:4px 0 0;padding:8px;width:110px"></div>
-        <div><label style="font-size:12px;color:var(--muted)">Taille (cm)</label>
-          <input type="number" id="imc-taille" value="${meta.taille ?? ""}" placeholder="ex : 172" step="any" min="0" onchange="saveIMC('${uid}')" style="margin:4px 0 0;padding:8px;width:110px"></div>
-        <div style="font-size:14px">IMC : <strong id="imc-val">${v ?? "—"}</strong> kg/m²</div>
-      </div>`;
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px">
+        <div style="flex:1;min-width:90px"><label style="font-size:11px;color:var(--muted)">Poids (kg)</label>
+          <input type="number" id="imc-poids" value="${meta.poids ?? ""}" placeholder="ex : 65" step="any" min="0" onchange="saveIMC('${uid}')" style="margin:4px 0 0;padding:9px;width:100%;font-size:16px;font-weight:600"></div>
+        <div style="flex:1;min-width:90px"><label style="font-size:11px;color:var(--muted)">Taille (cm)</label>
+          <input type="number" id="imc-taille" value="${meta.taille ?? ""}" placeholder="ex : 172" step="any" min="0" onchange="saveIMC('${uid}')" style="margin:4px 0 0;padding:9px;width:100%;font-size:16px;font-weight:600"></div>
+      </div>
+      <div style="font-size:13px;margin-top:8px">IMC : <strong id="imc-val">${v ?? "—"}</strong> kg/m²</div>`;
   } else if (t.type === "ricci") {
     corps = `
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px">
-        <span style="font-size:14px">Score : <strong id="ricci-score">${v ?? "—"}</strong> / 45</span>
-        <button class="btn btn-outline" style="width:auto;padding:7px 14px" onclick="ouvrirRicci('${uid}')">Répondre au questionnaire</button>
+      <div style="margin-top:10px">
+        <div style="font-size:13px;margin-bottom:8px">Score : <strong id="ricci-score">${v ?? "—"}</strong> / 45</div>
+        <button class="btn btn-outline" style="width:100%;padding:9px" onclick="ouvrirRicci('${uid}')">Répondre au questionnaire</button>
       </div>`;
   } else if (t.type === "choix") {
     const b = BAREMES[t.code] || { options: [] };
     corps = `
-      <div class="test-input-row" style="margin-top:8px">
-        <select id="input-${t.id}" onchange="saveChoix('${uid}','${t.id}',this.value)" style="margin:0;padding:9px">
-          <option value="">— Sélectionner la position —</option>
+      <div class="test-input-row">
+        <select id="input-${t.id}" onchange="saveChoix('${uid}','${t.id}',this.value)">
+          <option value="">— Choisir —</option>
           ${b.options.map(o => `<option value="${o.cle}" ${v === o.cle ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
         </select>
       </div>`;
   } else {
     corps = `
-      <div class="test-input-row" style="margin-top:8px">
+      <div class="test-input-row">
         <input type="number" id="input-${t.id}" placeholder="${esc(t.placeholder)}" value="${v ?? ""}"
           onchange="sauvegarderTest('${uid}','${t.id}',this.value)" step="any" min="0">
         <span class="test-unite">${esc(t.unite)}</span>
       </div>`;
   }
-  return `<div class="test-item">${tete}${corps}<div class="test-saved" id="saved-${t.id}">✓ Sauvegardé</div></div>`;
+  return `<div class="test-item" id="card-${t.id}">${tete}${corps}<div class="test-saved" id="saved-${t.id}">✓ Enregistré</div></div>`;
 }
+
+// Libellés des familles affichés en tête de section
+const CAT_LABELS = {
+  "IMC": "Corpulence", "Activité": "Activité physique", "Endurance": "Endurance",
+  "Force": "Force musculaire", "Équilibre": "Équilibre", "Souplesse": "Souplesse"
+};
 
 async function renderTests(uid) {
   const container = document.getElementById("tests-container");
@@ -1644,8 +1652,11 @@ async function renderTests(uid) {
   familles.forEach(cat => {
     const dans = TESTS.filter(t => t.categorie === cat);
     if (!dans.length) return;
-    html += `<h3 style="margin:18px 0 8px;color:var(--bleu);font-size:15px;border-bottom:1px solid var(--gris2);padding-bottom:4px">${esc(cat)}</h3>`;
-    dans.forEach(t => { html += blocTest(uid, t, meta, valeurs); });
+    html += `
+      <section class="cat-block">
+        <div class="cat-title"><span class="cat-bar"></span>${esc(CAT_LABELS[cat] || cat)}<span class="cat-count">${dans.length} test${dans.length>1?"s":""}</span></div>
+        <div class="cat-grid">${dans.map(t => blocTest(uid, t, meta, valeurs)).join("")}</div>
+      </section>`;
   });
   container.innerHTML = html;
   TESTS.forEach(t => majPastille(t, valeurs[t.id]));
