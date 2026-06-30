@@ -1298,6 +1298,7 @@ function calcVerdict(r) {
 // ── Variables globales (exposées sur window pour les handlers inline) ──
 let currentUser = null;
 let currentRole = null;
+let currentUserData = null;
 let allResultats = {};
 let allUsers    = {};
 let editUID     = null;
@@ -1387,6 +1388,7 @@ onAuthStateChanged(auth, async (user) => {
     if (snap.exists()) {
       const data = snap.val();
       currentRole = data.role || "etudiant";
+      currentUserData = data;
       document.getElementById("btn-logout").style.display = "block";
       showPage(currentRole);
       updateUserBar(data);
@@ -1974,6 +1976,14 @@ function renderProfEtudiants() {
     else if (st === "encours")   badge = '<span class="badge-wait">⏳ En cours</span>';
     else                         badge = '<span class="badge-none">○ Pas commencé</span>';
 
+    const valePar = meta.valide && meta.valideParNom ? `<div style="font-size:10px;color:var(--muted);margin-top:3px">par ${esc(meta.valideParNom)}</div>` : "";
+    let action = "";
+    if (meta.valide) {
+      action = `<button class="btn btn-sm" style="background:var(--or-cl);color:var(--orange);border:1px solid var(--orange);padding:5px 11px;font-size:12px;width:auto" onclick="profDevalider('${uid}')" title="Annuler la validation">↩ Dévalider</button>`;
+    } else if (nbTests > 0) {
+      action = `<button class="btn btn-sm" style="background:var(--vert);color:#fff;padding:5px 13px;font-size:12px;width:auto" onclick="profValider('${uid}')" title="Valider le bilan de l'étudiant">✓ Valider</button>`;
+    }
+
     return `
       <div class="student-row ${aBesoin ? "attn" : (st === "arelancer" ? "attn" : "")}">
         <div>
@@ -1986,7 +1996,10 @@ function renderProfEtudiants() {
           ${verdictHTML}
           ${resteHTML}
         </div>
-        ${badge}
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          ${badge}${valePar}
+          ${action}
+        </div>
       </div>
     `;
   }).join("");
@@ -2099,7 +2112,7 @@ function renderAdminResultats() {
               return `<td style="${bg}" title="${esc(valeurLisible(t, v))}">${aff}</td>`;
             }).join("")}
             <td>${r.meta?.valide
-              ? `<span class="badge-ok">✓ Validé${r.meta?.validePar === 'admin' ? ' <span style="font-size:10px;opacity:0.7">(admin)</span>' : ''}</span>`
+              ? `<span class="badge-ok">✓ Validé${r.meta?.validePar ? ` <span style="font-size:10px;opacity:0.7">(${r.meta.validePar === 'admin' ? 'admin' : esc(r.meta.valideParNom || 'prof')})</span>` : ''}</span>`
               : '<span class="badge-wait">⏳ Attente</span>'
             }</td>
             <td>
@@ -2450,6 +2463,35 @@ async function adminDevalider(uid) {
 }
 
 window.adminDevalider = adminDevalider;
+
+// ── Validation par le prof présent le jour de la session ──────
+async function profValider(uid) {
+  const meta = allResultats[uid]?.meta || {};
+  const tests = allResultats[uid]?.tests || {};
+  const nbTests = Object.keys(tests).length;
+  const nom = `${meta.prenom || ""} ${meta.nom || ""}`.trim() || "cet étudiant";
+  if (nbTests === 0) { alert(`${nom} n'a saisi aucun résultat pour l'instant.`); return; }
+  if (nbTests < TESTS.length) {
+    if (!confirm(`${nom} n'a saisi que ${nbTests}/${TESTS.length} tests. Valider quand même ?`)) return;
+  }
+  const profNom = `${currentUserData?.prenom || ""} ${currentUserData?.nom || ""}`.trim() || "prof";
+  try {
+    await update(ref(db, `resultats/${uid}/meta`), {
+      valide: true, validatedAt: Date.now(), validePar: "prof", valideParNom: profNom
+    });
+  } catch (e) { alert("Erreur : " + e.message); }
+}
+window.profValider = profValider;
+
+async function profDevalider(uid) {
+  const meta = allResultats[uid]?.meta || {};
+  const nom = `${meta.prenom || ""} ${meta.nom || ""}`.trim() || "cet étudiant";
+  if (!confirm(`Annuler la validation de ${nom} ? Il pourra de nouveau modifier ses résultats.`)) return;
+  try {
+    await update(ref(db, `resultats/${uid}/meta`), { valide: false, validatedAt: null, validePar: null, valideParNom: null });
+  } catch (e) { alert("Erreur : " + e.message); }
+}
+window.profDevalider = profDevalider;
 
 function ouvrirEdit(uid) {
   editUID = uid;
