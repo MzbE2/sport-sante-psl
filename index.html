@@ -248,6 +248,7 @@
     #session-detail-print-area, #session-detail-print-area * { visibility: visible; }
     #session-detail-print-area { position: absolute; top: 0; left: 0; width: 100%; box-shadow: none; border: none; }
     .no-print { display: none !important; }
+    .print-only { display: inline !important; }
   }
 
   /* ===== TABS ===== */
@@ -2275,6 +2276,7 @@ async function initAdmin() {
     renderAdminStats();
     renderAdminResultats();
     renderAdminSessions();
+    if (sessionDetailId) renderSessionDetailTable();
   });
   onValue(ref(db, "users"), snap => {
     allUsers = snap.exists() ? snap.val() : {};
@@ -2418,20 +2420,21 @@ function renderSessionDetailTable() {
           const meta = r.meta || {};
           const nb = r.tests ? Object.keys(r.tests).length : 0;
           const st = statutSessionEtudiant(r);
-          const stylesBadge = {
-            valide:  "background:var(--vert-cl);color:var(--vert)",
-            fini:    "background:var(--or-cl);color:var(--orange)",
-            encours: "background:var(--or-cl);color:var(--orange)",
-            pasco:   "background:var(--gris);color:var(--muted)"
-          };
-          const styleBadge = stylesBadge[st];
+          const estValide = st === "valide";
+          const incomplet = nb < TESTS.length;
           return `
             <tr>
               <td>${esc(meta.prenom || "")} ${esc((meta.nom||"").toUpperCase())}</td>
               <td>${meta.filiere || "—"}</td>
               <td>${sexeLabel(meta.sexe)}</td>
               <td>${nb}/${TESTS.length}</td>
-              <td><span class="vbadge" style="${styleBadge}">${STATUT_LABELS_SESSION[st]}</span></td>
+              <td>
+                <select class="no-print" onchange="changerStatutValidation('${uid}', this.value)" style="width:auto;margin:0;padding:4px 8px;font-size:12px;border-radius:20px;font-weight:700;${estValide ? 'background:var(--vert-cl);color:var(--vert);border-color:var(--vert-cl)' : 'background:var(--or-cl);color:var(--orange);border-color:var(--or-cl)'}">
+                  <option value="valide" ${estValide ? "selected" : ""}>✓ Validé</option>
+                  <option value="nonvalide" ${!estValide ? "selected" : ""}>${incomplet ? "En cours (" + nb + "/" + TESTS.length + ")" : "Fini, non validé"}</option>
+                </select>
+                <span class="print-only" style="display:none">${STATUT_LABELS_SESSION[st]}</span>
+              </td>
               <td class="no-print"><button class="btn btn-outline btn-sm" onclick="ouvrirEdit('${uid}')">✏️ Modifier</button></td>
             </tr>`;
         }).join("")}
@@ -2439,6 +2442,14 @@ function renderSessionDetailTable() {
     </table>`;
 }
 window.renderSessionDetailTable = renderSessionDetailTable;
+
+// Permet de changer le statut de validation directement depuis le tableau détaillé
+// d'une session (réutilise la même logique que côté prof).
+window.changerStatutValidation = async function(uid, valeur) {
+  if (valeur === "valide") await profValider(uid);
+  else await profDevalider(uid);
+  renderSessionDetailTable();
+};
 
 // ── Démo (admin) : générer / nettoyer un jeu de données fictives ─────────
 const DEMO_PRENOMS_F = ["Léa","Camille","Chloé","Emma","Manon","Inès","Sarah","Zoé","Julie","Alice"];
