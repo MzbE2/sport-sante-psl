@@ -567,7 +567,6 @@
     .header-logo { font-size: 16px; }
     /* tableaux admin : défilement horizontal au lieu de déborder */
     #admin-resultats-container, #admin-tests-container, #admin-users-container,
-    #historique-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   }
 </style>
 </head>
@@ -779,7 +778,6 @@
   <div class="tabs">
     <button class="tab active" onclick="showTab('tab-admin-dashboard', this)">Dashboard</button>
     <button class="tab" onclick="showTab('tab-admin-resultats', this)">Résultats</button>
-    <button class="tab" onclick="showTab('tab-admin-historique', this)">Historique</button>
     <button class="tab" onclick="showTab('tab-admin-users', this)">Utilisateurs</button>
     <button class="tab" onclick="showTab('tab-admin-tests', this)">Tests</button>
   </div>
@@ -804,29 +802,6 @@
         </select>
       </div>
       <div id="admin-resultats-container"><div class="loading">Chargement…</div></div>
-    </div>
-  </div>
-
-  <!-- Historique -->
-  <div id="tab-admin-historique" class="content" style="display:none">
-    <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px">
-        <h3 style="margin:0">📅 Historique des créneaux</h3>
-        <button class="btn btn-primary" style="width:auto; padding:8px 14px; font-size:13px" onclick="ouvrirCreneauModal()">+ Ajouter un créneau</button>
-      </div>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:14px">
-        Retrouvez quel groupe d'étudiants a été encadré, par qui, quel jour et à quelle heure.
-        Les étudiants sont rattachés automatiquement au créneau pendant lequel ils ont commencé leur bilan.
-      </p>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px">
-        <button class="btn btn-outline" style="width:auto; padding:6px 12px" onclick="histChangerMois(-1)">‹</button>
-        <strong id="hist-mois-label" style="min-width:150px; text-align:center"></strong>
-        <button class="btn btn-outline" style="width:auto; padding:6px 12px" onclick="histChangerMois(1)">›</button>
-        <select id="hist-filtre-encadrant" onchange="renderHistorique()" style="width:auto; margin-bottom:0; flex:1; min-width:180px">
-          <option value="">Tous les encadrants</option>
-        </select>
-      </div>
-      <div id="hist-calendrier"><div class="loading">Chargement…</div></div>
     </div>
   </div>
 
@@ -861,62 +836,6 @@
     <div style="display:flex; gap:10px; margin-top:16px">
       <button class="btn btn-primary" style="flex:1" onclick="saveEdit()">Enregistrer</button>
       <button class="btn btn-outline" onclick="closeModal()">Annuler</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modale créneau (création / édition) -->
-<div class="modal-bg" id="modal-creneau">
-  <div class="modal">
-    <h3 id="modal-creneau-titre">➕ Nouveau créneau</h3>
-    <input type="hidden" id="cr-id">
-    <label style="font-size:13px;font-weight:600">Date</label>
-    <input type="date" id="cr-date" style="margin-bottom:10px">
-    <div style="display:flex; gap:10px">
-      <div style="flex:1">
-        <label style="font-size:13px;font-weight:600">Début</label>
-        <input type="time" id="cr-debut" value="09:00" style="margin-bottom:10px">
-      </div>
-      <div style="flex:1">
-        <label style="font-size:13px;font-weight:600">Fin</label>
-        <input type="time" id="cr-fin" value="10:30" style="margin-bottom:10px">
-      </div>
-    </div>
-    <label style="font-size:13px;font-weight:600">Encadrants</label>
-    <div style="display:flex; gap:8px; margin-bottom:6px">
-      <select id="cr-encadrant-select" style="flex:1; margin-bottom:0">
-        <option value="">— Choisir un prof SUAPS —</option>
-      </select>
-      <button class="btn btn-outline" style="width:auto; padding:8px 12px" onclick="ajouterEncadrantSelect()">+</button>
-    </div>
-    <div style="display:flex; gap:8px; margin-bottom:6px">
-      <input type="text" id="cr-encadrant-libre" placeholder="…ou saisir un nom" style="flex:1; margin-bottom:0">
-      <button class="btn btn-outline" style="width:auto; padding:8px 12px" onclick="ajouterEncadrantLibre()">+</button>
-    </div>
-    <div id="cr-encadrants-tags" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px"></div>
-    <label style="font-size:13px;font-weight:600">Lieu (optionnel)</label>
-    <input type="text" id="cr-lieu" placeholder="ex : Gymnase A" style="margin-bottom:10px">
-    <label style="font-size:13px;font-weight:600">Filière du groupe (optionnel)</label>
-    <select id="cr-filiere" style="margin-bottom:12px">
-      <option value="">— Toutes / non précisée —</option>
-      <option value="LSO">LSO</option>
-      <option value="MSO">MSO</option>
-      <option value="ESCPI">ESCPI</option>
-      <option value="ENS">ENS</option>
-    </select>
-    <div style="display:flex; gap:10px; margin-top:4px">
-      <button class="btn btn-primary" style="flex:1" onclick="saveCreneau()">Enregistrer</button>
-      <button class="btn btn-outline" onclick="fermerCreneauModal()">Annuler</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modale détail d'un créneau -->
-<div class="modal-bg" id="modal-creneau-detail">
-  <div class="modal">
-    <div id="cr-detail-contenu"></div>
-    <div style="display:flex; gap:10px; margin-top:16px">
-      <button class="btn btn-outline" style="flex:1" onclick="fermerCreneauDetail()">Fermer</button>
     </div>
   </div>
 </div>
@@ -1339,11 +1258,6 @@ let currentUserData = null;
 let allResultats = {};
 let allUsers    = {};
 let editUID     = null;
-let allCreneaux = {};
-let crEncadrants = [];                 // encadrants en cours d'édition dans la modale
-let detailCreneauId = null;            // créneau actuellement ouvert en détail
-const HIST_DEFAUT = "2026-09";          // mois affiché par défaut (septembre 2026)
-let histMois = HIST_DEFAUT;             // format "AAAA-MM"
 // Comptes administrateurs (rôle admin attribué automatiquement à l'inscription
 // si l'e-mail figure ici). Pour en ajouter/retirer un, modifier cette liste.
 const ADMIN_EMAILS = [
@@ -2134,16 +2048,10 @@ async function initAdmin() {
     allResultats = snap.exists() ? snap.val() : {};
     renderAdminStats();
     renderAdminResultats();
-    renderHistorique();
   });
   onValue(ref(db, "users"), snap => {
     allUsers = snap.exists() ? snap.val() : {};
     renderAdminUsers();
-    remplirEncadrantsSelect();
-  });
-  onValue(ref(db, "creneaux"), snap => {
-    allCreneaux = snap.exists() ? snap.val() : {};
-    renderHistorique();
   });
 }
 
@@ -2655,316 +2563,6 @@ function closeModal() {
   document.getElementById("modal-edit").classList.remove("open");
   editUID = null;
 }
-
-// ── HISTORIQUE / CRÉNEAUX (Admin) ────────────────────────────
-
-// Encadrants candidats = comptes "Prof SUAPS"
-function profsSuaps() {
-  return Object.values(allUsers)
-    .filter(u => u.role === "prof")
-    .map(u => `${u.prenom || ""} ${(u.nom || "").toUpperCase()}`.trim())
-    .filter(Boolean)
-    .sort();
-}
-
-function remplirEncadrantsSelect() {
-  const sel = document.getElementById("cr-encadrant-select");
-  if (sel) {
-    sel.innerHTML = '<option value="">— Choisir un prof SUAPS —</option>' +
-      profsSuaps().map(p => `<option value="${p}">${p}</option>`).join("");
-  }
-  const filtre = document.getElementById("hist-filtre-encadrant");
-  if (filtre) {
-    const noms = new Set();
-    Object.values(allCreneaux).forEach(c => (c.encadrants || []).forEach(e => noms.add(e)));
-    profsSuaps().forEach(p => noms.add(p));
-    const cur = filtre.value;
-    filtre.innerHTML = '<option value="">Tous les encadrants</option>' +
-      [...noms].sort().map(n => `<option value="${n}">${n}</option>`).join("");
-    filtre.value = cur;
-  }
-}
-
-// Timestamp de rattachement = 1re saisie (à défaut : validation)
-function creneauTimestamp(r) {
-  return r.meta?.startedAt || r.meta?.validatedAt || null;
-}
-
-
-function labelFiliere(v) { return FILIERE_LABELS[v] || v || "—"; }
-
-// Étudiants d'un créneau : priorité à l'affectation manuelle (meta.creneauId),
-// sinon rattachement automatique par l'heure de la 1re saisie.
-//   meta.creneauId === id          → forcé dans ce créneau
-//   meta.creneauId === "__aucun__" → retiré de tout créneau
-//   meta.creneauId absent          → auto selon startedAt
-function creneauEtudiants(c, id) {
-  const debut = new Date(`${c.date}T${c.debut || "00:00"}`).getTime();
-  const fin   = new Date(`${c.date}T${c.fin   || "23:59"}`).getTime();
-  return Object.entries(allResultats)
-    .filter(([, r]) => r.meta && r.meta.filiere)
-    .filter(([, r]) => {
-      const force = r.meta.creneauId;
-      if (force === "__aucun__") return false;
-      if (force) return force === id;
-      const ts = creneauTimestamp(r);
-      return ts && ts >= debut && ts <= fin;
-    })
-    .sort(([, a], [, b]) => `${a.meta.nom || ""}`.localeCompare(`${b.meta.nom || ""}`));
-}
-
-function histChangerMois(delta) {
-  const [y, m] = histMois.split("-").map(Number);
-  const d = new Date(y, m - 1 + delta, 1);
-  histMois = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  renderHistorique();
-}
-window.histChangerMois = histChangerMois;
-
-function renderHistorique() {
-  remplirEncadrantsSelect();
-  const cont = document.getElementById("hist-calendrier");
-  if (!cont) return;
-  const filtreEnc = document.getElementById("hist-filtre-encadrant")?.value || "";
-  const [y, m] = histMois.split("-").map(Number);
-  const moisNoms = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
-  const label = document.getElementById("hist-mois-label");
-  if (label) label.textContent = `${moisNoms[m - 1]} ${y}`;
-
-  const parJour = {};
-  Object.entries(allCreneaux).forEach(([id, c]) => {
-    if (!c.date || !c.date.startsWith(histMois)) return;
-    if (filtreEnc && !(c.encadrants || []).includes(filtreEnc)) return;
-    (parJour[c.date] = parJour[c.date] || []).push({ id, ...c });
-  });
-  Object.values(parJour).forEach(arr => arr.sort((a, b) => (a.debut || "").localeCompare(b.debut || "")));
-
-  const premier = new Date(y, m - 1, 1);
-  let decalage = premier.getDay() - 1; if (decalage < 0) decalage = 6;
-  const nbJours = new Date(y, m, 0).getDate();
-  const aujISO = new Date().toISOString().slice(0, 10);
-  const dows = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
-
-  let html = '<div class="cal-grid">' + dows.map(d => `<div class="cal-dow">${d}</div>`).join("");
-  for (let i = 0; i < decalage; i++) html += '<div class="cal-cell vide"></div>';
-  for (let jour = 1; jour <= nbJours; jour++) {
-    const dateISO = `${histMois}-${String(jour).padStart(2, "0")}`;
-    const pills = (parJour[dateISO] || []).map(c => {
-      const nb = creneauEtudiants(c, c.id).length;
-      const encs = (c.encadrants || []).join(", ") || "—";
-      return `<div class="cal-pill" onclick="ouvrirCreneauDetail('${c.id}')">
-        <span class="h">${c.debut || ""}–${c.fin || ""}</span>
-        <span class="e">${encs}</span>
-        ${nb ? `<span class="n">${nb} étud.</span>` : ""}
-      </div>`;
-    }).join("");
-    html += `<div class="cal-cell ${dateISO === aujISO ? "today" : ""}">
-      <div class="cal-num">${jour}</div>${pills}
-      <div class="cal-add" onclick="ouvrirCreneauModal(null,'${dateISO}')">+ créneau</div>
-    </div>`;
-  }
-  html += "</div>";
-  cont.innerHTML = html;
-}
-window.renderHistorique = renderHistorique;
-
-// ----- Modale création / édition -----
-function rafraichirEncadrantsTags() {
-  const box = document.getElementById("cr-encadrants-tags");
-  if (box) box.innerHTML = crEncadrants.map((e, i) =>
-    `<span class="enc-tag">${e}<span onclick="retirerEncadrant(${i})">✕</span></span>`).join("");
-}
-function ajouterEncadrantSelect() {
-  const sel = document.getElementById("cr-encadrant-select");
-  if (sel.value && !crEncadrants.includes(sel.value)) { crEncadrants.push(sel.value); rafraichirEncadrantsTags(); }
-  sel.value = "";
-}
-function ajouterEncadrantLibre() {
-  const inp = document.getElementById("cr-encadrant-libre");
-  const v = inp.value.trim();
-  if (v && !crEncadrants.includes(v)) { crEncadrants.push(v); rafraichirEncadrantsTags(); }
-  inp.value = "";
-}
-function retirerEncadrant(i) { crEncadrants.splice(i, 1); rafraichirEncadrantsTags(); }
-window.ajouterEncadrantSelect = ajouterEncadrantSelect;
-window.ajouterEncadrantLibre  = ajouterEncadrantLibre;
-window.retirerEncadrant       = retirerEncadrant;
-
-function ouvrirCreneauModal(id, datePreremplie) {
-  remplirEncadrantsSelect();
-  const c = id ? allCreneaux[id] : null;
-  document.getElementById("modal-creneau-titre").textContent = id ? "✏️ Modifier le créneau" : "➕ Nouveau créneau";
-  document.getElementById("cr-id").value    = id || "";
-  document.getElementById("cr-date").value  = c?.date  || datePreremplie || (histMois + "-01");
-  document.getElementById("cr-debut").value = c?.debut || "09:00";
-  document.getElementById("cr-fin").value   = c?.fin   || "10:30";
-  document.getElementById("cr-lieu").value  = c?.lieu  || "";
-  document.getElementById("cr-filiere").value = c?.filiere || "";
-  crEncadrants = c?.encadrants ? [...c.encadrants] : [];
-  rafraichirEncadrantsTags();
-  document.getElementById("cr-encadrant-libre").value = "";
-  document.getElementById("modal-creneau").classList.add("open");
-}
-window.ouvrirCreneauModal = ouvrirCreneauModal;
-
-function fermerCreneauModal() { document.getElementById("modal-creneau").classList.remove("open"); }
-window.fermerCreneauModal = fermerCreneauModal;
-
-async function saveCreneau() {
-  const date  = document.getElementById("cr-date").value;
-  const debut = document.getElementById("cr-debut").value;
-  const fin   = document.getElementById("cr-fin").value;
-  if (!date)            return alert("Veuillez indiquer une date.");
-  if (!debut || !fin)   return alert("Veuillez indiquer l'heure de début et de fin.");
-  if (fin <= debut)     return alert("L'heure de fin doit être après le début.");
-  const libre = document.getElementById("cr-encadrant-libre").value.trim();
-  if (libre && !crEncadrants.includes(libre)) crEncadrants.push(libre);
-
-  let id = document.getElementById("cr-id").value;
-  const existe = !!id;
-  if (!id) id = "cr_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
-  await set(ref(db, `creneaux/${id}`), {
-    date, debut, fin,
-    encadrants: crEncadrants,
-    lieu: document.getElementById("cr-lieu").value.trim(),
-    filiere: document.getElementById("cr-filiere").value,
-    createdAt: existe ? (allCreneaux[id]?.createdAt || Date.now()) : Date.now()
-  });
-  fermerCreneauModal();
-}
-window.saveCreneau = saveCreneau;
-
-// ----- Détail d'un créneau -----
-// Construit les <option> de tous les créneaux (pour déplacer un étudiant)
-function optionsCreneaux(selId) {
-  const moisCourt = ["jan","fév","mar","avr","mai","juin","juil","aoû","sep","oct","nov","déc"];
-  return Object.entries(allCreneaux)
-    .sort(([, a], [, b]) => (a.date + a.debut).localeCompare(b.date + b.debut))
-    .map(([id, c]) => {
-      const [, mm, dd] = c.date.split("-");
-      const lib = `${parseInt(dd)} ${moisCourt[parseInt(mm) - 1]} · ${c.debut}`;
-      return `<option value="${id}" ${id === selId ? "selected" : ""}>${lib}</option>`;
-    }).join("");
-}
-
-function ouvrirCreneauDetail(id) {
-  const c = allCreneaux[id];
-  if (!c) return;
-  detailCreneauId = id;
-  const etudiants = creneauEtudiants(c, id);
-  const moisNoms = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
-  const [yy, mm, dd] = c.date.split("-");
-  const dateLisible = `${parseInt(dd)} ${moisNoms[parseInt(mm) - 1]} ${yy}`;
-  const optsAutres = optionsCreneaux(null);
-
-  const listeEtud = etudiants.length
-    ? etudiants.map(([uid, r]) => {
-        const st = statutEtudiant(r);
-        const badge = st === "valide" ? '<span class="badge-ok">✓</span>'
-          : st === "arelancer" ? '<span class="badge-relance">⚠</span>'
-          : st === "encours" ? '<span class="badge-wait">⏳</span>'
-          : '<span class="badge-none">○</span>';
-        const manuel = r.meta.creneauId === id
-          ? ' <span style="font-size:10px;color:var(--bleu)" title="Affecté manuellement">📌</span>' : "";
-        return `<div class="student-row">
-          <div style="flex:1">
-            <div class="student-name">${r.meta.prenom || ""} ${r.meta.nom || ""}${manuel}</div>
-            <div class="student-meta"><span class="filiere-tag">${r.meta.filiere || "—"}</span> ${badge}</div>
-          </div>
-          <select onchange="deplacerEtudiant('${uid}', this.value)" style="width:auto;margin-bottom:0;font-size:12px;padding:5px 6px">
-            <option value="">Déplacer…</option>
-            <option value="__auto__">↺ Rattachement auto</option>
-            <option value="__aucun__">✕ Retirer du groupe</option>
-            <optgroup label="Vers un créneau">${optsAutres}</optgroup>
-          </select>
-        </div>`;
-      }).join("")
-    : "<p style='color:var(--muted);font-size:13px'>Aucun étudiant rattaché (personne n'a commencé son bilan pendant cette plage, et aucun n'a été ajouté manuellement).</p>";
-
-  // Étudiants ajoutables (pas déjà dans ce créneau), groupés par filière
-  // (filière du créneau en tête) et triés alphabétiquement dans chaque groupe.
-  const dejaIds = new Set(etudiants.map(([uid]) => uid));
-  const parFiliere = {};
-  Object.entries(allResultats)
-    .filter(([uid, r]) => r.meta && r.meta.filiere && !dejaIds.has(uid))
-    .forEach(([uid, r]) => { (parFiliere[r.meta.filiere] = parFiliere[r.meta.filiere] || []).push([uid, r]); });
-  const ajoutables = Object.keys(parFiliere)
-    .sort((a, b) => {
-      if (a === c.filiere) return -1;
-      if (b === c.filiere) return 1;
-      return labelFiliere(a).localeCompare(labelFiliere(b));
-    })
-    .map(fil => {
-      const opts = parFiliere[fil]
-        .sort(([, a], [, b]) =>
-          `${a.meta.nom || ""} ${a.meta.prenom || ""}`.localeCompare(`${b.meta.nom || ""} ${b.meta.prenom || ""}`))
-        .map(([uid, r]) => `<option value="${uid}">${r.meta.prenom || ""} ${r.meta.nom || ""}</option>`)
-        .join("");
-      return `<optgroup label="${labelFiliere(fil)}">${opts}</optgroup>`;
-    }).join("");
-
-  document.getElementById("cr-detail-contenu").innerHTML = `
-    <h3 style="margin-bottom:6px">📅 ${dateLisible}</h3>
-    <p style="font-size:14px;margin-bottom:4px"><strong>${c.debut}–${c.fin}</strong>${c.lieu ? " · " + c.lieu : ""}</p>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:4px">👤 ${(c.encadrants || []).join(", ") || "Aucun encadrant"}</p>
-    ${c.filiere ? `<p style="font-size:13px;margin-bottom:10px">🎓 <span class="filiere-tag">${labelFiliere(c.filiere)}</span></p>` : ""}
-    <div style="display:flex;gap:8px;margin:10px 0 14px;flex-wrap:wrap">
-      <button class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:13px" onclick="fermerCreneauDetail();ouvrirCreneauModal('${id}')">✏️ Modifier</button>
-      <button class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:13px" onclick="dupliquerCreneau('${id}')">⧉ Dupliquer</button>
-      <button class="btn" style="width:auto;padding:6px 12px;font-size:13px;background:var(--rouge-cl);color:var(--rouge);border:1px solid var(--rouge)" onclick="supprimerCreneau('${id}')">🗑 Supprimer</button>
-    </div>
-    <h4 style="font-size:13px;margin-bottom:6px">Étudiants encadrés (${etudiants.length})</h4>
-    ${listeEtud}
-    <div style="margin-top:12px">
-      <select onchange="if(this.value){deplacerEtudiant(this.value,'${id}');this.value=''}" style="width:100%;margin-bottom:0;font-size:13px">
-        <option value="">+ Ajouter un étudiant à ce créneau…</option>
-        ${ajoutables}
-      </select>
-    </div>
-  `;
-  document.getElementById("modal-creneau-detail").classList.add("open");
-}
-window.ouvrirCreneauDetail = ouvrirCreneauDetail;
-
-// Affecte / retire / réinitialise le rattachement d'un étudiant
-async function deplacerEtudiant(uid, value) {
-  if (!value) return;
-  let nouvelle;
-  if (value === "__auto__")       nouvelle = null;           // retour au rattachement auto
-  else if (value === "__aucun__") nouvelle = "__aucun__";    // retiré de tout créneau
-  else                            nouvelle = value;          // forcé dans ce créneau
-  await update(ref(db, `resultats/${uid}/meta`), { creneauId: nouvelle });
-  // MAJ locale immédiate pour un retour instantané (avant l'écho Firebase)
-  if (allResultats[uid]?.meta) allResultats[uid].meta.creneauId = nouvelle;
-  if (detailCreneauId) ouvrirCreneauDetail(detailCreneauId); // rafraîchir le détail ouvert
-}
-window.deplacerEtudiant = deplacerEtudiant;
-
-// Duplique un créneau (mêmes horaires/encadrants, nouvelle date à choisir)
-function dupliquerCreneau(id) {
-  const c = allCreneaux[id];
-  if (!c) return;
-  fermerCreneauDetail();
-  ouvrirCreneauModal(null, c.date);
-  document.getElementById("modal-creneau-titre").textContent = "⧉ Dupliquer le créneau";
-  document.getElementById("cr-debut").value = c.debut || "09:00";
-  document.getElementById("cr-fin").value   = c.fin   || "10:30";
-  document.getElementById("cr-lieu").value  = c.lieu  || "";
-  document.getElementById("cr-filiere").value = c.filiere || "";
-  crEncadrants = c.encadrants ? [...c.encadrants] : [];
-  rafraichirEncadrantsTags();
-}
-window.dupliquerCreneau = dupliquerCreneau;
-
-function fermerCreneauDetail() { document.getElementById("modal-creneau-detail").classList.remove("open"); detailCreneauId = null; }
-window.fermerCreneauDetail = fermerCreneauDetail;
-
-async function supprimerCreneau(id) {
-  if (!confirm("Supprimer ce créneau ? (les résultats des étudiants ne sont pas affectés)")) return;
-  await remove(ref(db, `creneaux/${id}`));
-  fermerCreneauDetail();
-}
-window.supprimerCreneau = supprimerCreneau;
 
 </script>
 </body>
