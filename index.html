@@ -242,6 +242,14 @@
   #preview-bar .pv-btn:hover { background: rgba(255,255,255,0.22); }
   #preview-bar .pv-btn.active { background: #fff; color: #2b2b2b; }
 
+  /* ===== EXPORT PDF (impression) ===== */
+  @media print {
+    body * { visibility: hidden; }
+    #session-detail-print-area, #session-detail-print-area * { visibility: visible; }
+    #session-detail-print-area { position: absolute; top: 0; left: 0; width: 100%; box-shadow: none; border: none; }
+    .no-print { display: none !important; }
+  }
+
   /* ===== TABS ===== */
   .tabs {
     display: flex;
@@ -817,27 +825,54 @@
 
   <!-- Sessions -->
   <div id="tab-admin-sessions" class="content" style="display:none">
-    <div class="card">
-      <h3>📅 Sessions passées</h3>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:14px">
-        Retrouvez, pour chaque créneau, quels étudiants sont passés, avec quel(s) enseignant(s), à quelle date et heure,
-        et s'ils ont fait tous les tests.
-      </p>
-      <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap">
-        <select id="sess-filtre-encadrant" onchange="renderAdminSessions()" style="width:auto; margin-bottom:0; flex:1; min-width:180px">
-          <option value="">Tous les encadrants</option>
-        </select>
+    <div id="sessions-vue-liste">
+      <div class="card">
+        <h3>📅 Sessions passées</h3>
+        <p style="font-size:13px; color:var(--muted); margin-bottom:14px">
+          Retrouvez, pour chaque créneau, quels étudiants sont passés, avec quel(s) enseignant(s), à quelle date et heure,
+          et s'ils ont fait tous les tests. Cliquez sur une session pour voir le détail, l'exporter en PDF ou modifier des résultats.
+        </p>
+        <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap">
+          <select id="sess-filtre-encadrant" onchange="renderAdminSessions()" style="width:auto; margin-bottom:0; flex:1; min-width:180px">
+            <option value="">Tous les encadrants</option>
+          </select>
+        </div>
+        <div id="admin-sessions-container"><div class="loading">Chargement…</div></div>
       </div>
-      <div id="admin-sessions-container"><div class="loading">Chargement…</div></div>
     </div>
-  </div>
 
-  <!-- Détail d'une session (modale légère) -->
-  <div class="modal-bg" id="modal-session-detail">
-    <div class="modal">
-      <div id="sess-detail-contenu"></div>
-      <div style="display:flex; gap:10px; margin-top:16px">
-        <button class="btn btn-outline" style="flex:1" onclick="fermerSessionDetail()">Fermer</button>
+    <!-- Page détail d'une session (remplace l'ancienne pop-up) -->
+    <div id="sessions-vue-detail" style="display:none">
+      <div class="card no-print">
+        <button class="btn btn-outline" style="width:auto; padding:8px 14px; font-size:13px" onclick="retourListeSessions()">← Retour aux sessions</button>
+      </div>
+      <div class="card" id="session-detail-print-area">
+        <div id="sess-detail-entete"></div>
+        <div class="no-print" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:14px 0">
+          <input id="sess-detail-recherche" type="text" placeholder="🔎 Rechercher un étudiant…" oninput="renderSessionDetailTable()" style="flex:1; min-width:180px; margin-bottom:0">
+          <select id="sess-detail-filiere" onchange="renderSessionDetailTable()" style="width:auto; margin-bottom:0">
+            <option value="">Toutes les filières</option>
+            <option value="LSO">LSO</option>
+            <option value="MSO">MSO</option>
+            <option value="ESCPI">ESCPI</option>
+            <option value="ENS">ENS</option>
+          </select>
+          <select id="sess-detail-statut" onchange="renderSessionDetailTable()" style="width:auto; margin-bottom:0">
+            <option value="">Tous les statuts</option>
+            <option value="valide">✓ Validé</option>
+            <option value="fini">⚠ Fini, non validé</option>
+            <option value="encours">En cours</option>
+            <option value="pasco">Pas commencé</option>
+          </select>
+          <select id="sess-detail-tri" onchange="renderSessionDetailTable()" style="width:auto; margin-bottom:0">
+            <option value="nom">Trier par nom</option>
+            <option value="filiere">Trier par filière</option>
+            <option value="tests">Trier par nb de tests</option>
+            <option value="statut">Trier par statut</option>
+          </select>
+          <button class="btn btn-primary" style="width:auto; padding:8px 14px; font-size:13px" onclick="window.print()">🖨️ Exporter en PDF</button>
+        </div>
+        <div id="sess-detail-table"></div>
       </div>
     </div>
   </div>
@@ -2307,39 +2342,103 @@ function renderAdminSessions() {
 }
 window.renderAdminSessions = renderAdminSessions;
 
+let sessionDetailId = null; // session actuellement affichée en page détail
+
 function ouvrirSessionDetail(id) {
   const s = allSessions[id]; if (!s) return;
-  const etus = etudiantsSession(id).sort(([, a], [, b]) => `${a.meta?.nom||""}`.localeCompare(`${b.meta?.nom||""}`));
-  const lignes = etus.map(([uid, r]) => {
-    const meta = r.meta || {};
-    const nb = r.tests ? Object.keys(r.tests).length : 0;
-    const complet = nb >= TESTS.length;
-    const statutHTML = r.meta?.valide
-      ? `<span class="badge-ok">✓ Validé</span>`
-      : complet
-        ? `<span class="vbadge" style="background:var(--or-cl);color:var(--orange)">⚠ Fini, non validé</span>`
-        : `<span class="vbadge" style="background:var(--gris);color:var(--muted)">${nb}/${TESTS.length} tests</span>`;
-    return `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--gris2)">
-        <div>
-          <strong>${esc(meta.prenom || "")} ${esc(meta.nom || "")}</strong>
-          <span style="color:var(--muted);font-size:12px"> · ${meta.filiere || "—"}</span>
-        </div>
-        ${statutHTML}
-      </div>`;
-  }).join("") || `<p style="color:var(--muted);font-size:13px">Aucun étudiant sur cette session.</p>`;
+  sessionDetailId = id;
 
-  document.getElementById("sess-detail-contenu").innerHTML = `
+  document.getElementById("sess-detail-entete").innerHTML = `
     <h3 style="margin-bottom:6px">📅 ${formatDateFR(s.date)}</h3>
     <p style="font-size:14px;margin-bottom:4px"><strong>${esc(s.debut || "")}${s.fin ? " – " + esc(s.fin) : ""}</strong></p>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">👤 ${(s.encadrants || []).map(esc).join(", ") || "Aucun encadrant"}</p>
-    <div>${lignes}</div>`;
-  document.getElementById("modal-session-detail").classList.add("open");
+    <p style="font-size:13px;color:var(--muted)">👤 ${(s.encadrants || []).map(esc).join(", ") || "Aucun encadrant"}</p>`;
+
+  // Réinitialise les filtres à chaque ouverture
+  document.getElementById("sess-detail-recherche").value = "";
+  document.getElementById("sess-detail-filiere").value = "";
+  document.getElementById("sess-detail-statut").value = "";
+  document.getElementById("sess-detail-tri").value = "nom";
+
+  document.getElementById("sessions-vue-liste").style.display = "none";
+  document.getElementById("sessions-vue-detail").style.display = "block";
+  renderSessionDetailTable();
 }
 window.ouvrirSessionDetail = ouvrirSessionDetail;
 
-function fermerSessionDetail() { document.getElementById("modal-session-detail").classList.remove("open"); }
-window.fermerSessionDetail = fermerSessionDetail;
+function retourListeSessions() {
+  sessionDetailId = null;
+  document.getElementById("sessions-vue-detail").style.display = "none";
+  document.getElementById("sessions-vue-liste").style.display = "block";
+}
+window.retourListeSessions = retourListeSessions;
+
+// Statut synthétique d'un étudiant pour le tri/filtre de la page détail
+function statutSessionEtudiant(r) {
+  if (r.meta?.valide) return "valide";
+  const nb = r.tests ? Object.keys(r.tests).length : 0;
+  if (nb === 0) return "pasco";
+  if (nb >= TESTS.length) return "fini";
+  return "encours";
+}
+const STATUT_LABELS_SESSION = {
+  valide: "✓ Validé", fini: "⚠ Fini, non validé", encours: "En cours", pasco: "Pas commencé"
+};
+
+function renderSessionDetailTable() {
+  if (!sessionDetailId) return;
+  const recherche = document.getElementById("sess-detail-recherche").value.trim().toLowerCase();
+  const filtreFiliere = document.getElementById("sess-detail-filiere").value;
+  const filtreStatut = document.getElementById("sess-detail-statut").value;
+  const tri = document.getElementById("sess-detail-tri").value;
+
+  let etus = etudiantsSession(sessionDetailId);
+
+  if (recherche) etus = etus.filter(([, r]) => `${r.meta?.prenom || ""} ${r.meta?.nom || ""}`.toLowerCase().includes(recherche));
+  if (filtreFiliere) etus = etus.filter(([, r]) => r.meta?.filiere === filtreFiliere);
+  if (filtreStatut) etus = etus.filter(([, r]) => statutSessionEtudiant(r) === filtreStatut);
+
+  const ordreStatut = { pasco: 0, encours: 1, fini: 2, valide: 3 };
+  etus.sort(([, a], [, b]) => {
+    if (tri === "filiere") return `${a.meta?.filiere || ""}`.localeCompare(`${b.meta?.filiere || ""}`) || `${a.meta?.nom||""}`.localeCompare(`${b.meta?.nom||""}`);
+    if (tri === "tests")   return (Object.keys(b.tests||{}).length) - (Object.keys(a.tests||{}).length);
+    if (tri === "statut")  return ordreStatut[statutSessionEtudiant(a)] - ordreStatut[statutSessionEtudiant(b)];
+    return `${a.meta?.nom||""}`.localeCompare(`${b.meta?.nom||""}`);
+  });
+
+  const cont = document.getElementById("sess-detail-table");
+  if (!etus.length) { cont.innerHTML = `<p style="color:var(--muted);font-size:13px">Aucun étudiant ne correspond.</p>`; return; }
+
+  cont.innerHTML = `
+    <table class="admin-table">
+      <thead><tr>
+        <th>Nom</th><th>Filière</th><th>Sexe</th><th>Tests</th><th>Statut</th><th class="no-print">Action</th>
+      </tr></thead>
+      <tbody>
+        ${etus.map(([uid, r]) => {
+          const meta = r.meta || {};
+          const nb = r.tests ? Object.keys(r.tests).length : 0;
+          const st = statutSessionEtudiant(r);
+          const stylesBadge = {
+            valide:  "background:var(--vert-cl);color:var(--vert)",
+            fini:    "background:var(--or-cl);color:var(--orange)",
+            encours: "background:var(--or-cl);color:var(--orange)",
+            pasco:   "background:var(--gris);color:var(--muted)"
+          };
+          const styleBadge = stylesBadge[st];
+          return `
+            <tr>
+              <td>${esc(meta.prenom || "")} ${esc((meta.nom||"").toUpperCase())}</td>
+              <td>${meta.filiere || "—"}</td>
+              <td>${sexeLabel(meta.sexe)}</td>
+              <td>${nb}/${TESTS.length}</td>
+              <td><span class="vbadge" style="${styleBadge}">${STATUT_LABELS_SESSION[st]}</span></td>
+              <td class="no-print"><button class="btn btn-outline btn-sm" onclick="ouvrirEdit('${uid}')">✏️ Modifier</button></td>
+            </tr>`;
+        }).join("")}
+      </tbody>
+    </table>`;
+}
+window.renderSessionDetailTable = renderSessionDetailTable;
 
 // ── Démo (admin) : générer / nettoyer un jeu de données fictives ─────────
 const DEMO_PRENOMS_F = ["Léa","Camille","Chloé","Emma","Manon","Inès","Sarah","Zoé","Julie","Alice"];
