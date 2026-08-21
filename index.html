@@ -213,6 +213,35 @@
   .pill-prof     { background: var(--vert-cl); color: var(--vert); }
   .pill-admin    { background: var(--rouge-cl); color: var(--rouge); }
 
+  /* ===== BARRE "MODE TEST" (admin uniquement) ===== */
+  #preview-bar {
+    display: none;
+    position: sticky;
+    top: 0;
+    z-index: 500;
+    background: #2b2b2b;
+    color: #fff;
+    padding: 8px 16px;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
+  #preview-bar.visible { display: flex; }
+  #preview-bar .pv-label { font-weight: 700; opacity: .85; margin-right: 4px; }
+  #preview-bar .pv-btn {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: #fff;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #preview-bar .pv-btn:hover { background: rgba(255,255,255,0.22); }
+  #preview-bar .pv-btn.active { background: #fff; color: #2b2b2b; }
+
   /* ===== TABS ===== */
   .tabs {
     display: flex;
@@ -580,6 +609,13 @@
 <!-- ============================================================ -->
 <!--  BARRE UTILISATEUR CONNECTÉ                                  -->
 <!-- ============================================================ -->
+<div id="preview-bar">
+  <span class="pv-label">🧪 Mode test (admin) — voir comme :</span>
+  <button class="pv-btn" id="pv-btn-etudiant" onclick="previewComme('etudiant')">👤 Étudiant</button>
+  <button class="pv-btn" id="pv-btn-prof" onclick="previewComme('prof')">🎓 Prof</button>
+  <button class="pv-btn active" id="pv-btn-admin" onclick="previewComme('admin')">🛠 Admin</button>
+</div>
+
 <div id="user-bar">
   <div class="user-avatar" id="user-avatar"></div>
   <div class="user-info">
@@ -1276,6 +1312,8 @@ let currentUserData = null;
 let allResultats = {};
 let allUsers    = {};
 let editUID     = null;
+let previewRole = null;                // rôle actuellement prévisualisé par un admin ("etudiant"/"prof"/"admin")
+let previewInit = { etudiant: false, prof: false }; // évite de ré-attacher les écouteurs à chaque bascule
 let allSessions = {};                  // sessions (créneaux en direct) : {id: {date, debut, fin, encadrants[], statut, createdAt, closedAt}}
 // Comptes administrateurs (rôle admin attribué automatiquement à l'inscription
 // si l'e-mail figure ici). Pour en ajouter/retirer un, modifier cette liste.
@@ -1370,6 +1408,12 @@ onAuthStateChanged(auth, async (user) => {
       if (currentRole === "etudiant") initEtudiant(user.uid, data);
       if (currentRole === "prof")     initProf();
       if (currentRole === "admin")    initAdmin();
+      if (currentRole === "admin") {
+        previewRole = "admin";
+        document.getElementById("preview-bar").classList.add("visible");
+      } else {
+        document.getElementById("preview-bar").classList.remove("visible");
+      }
     }
   } else {
     currentUser = null;
@@ -1389,6 +1433,31 @@ function showPage(role) {
   const overlay = document.getElementById("succes-overlay");
   if (overlay) overlay.classList.remove("open");
 }
+
+// ── Mode test (admin) : prévisualiser les interfaces étudiant / prof / admin ──
+// L'admin ne se déconnecte pas et ne change pas de compte : on affiche juste une
+// autre page avec ses propres données (son uid a bien un enregistrement dans
+// resultats/ et les règles Firebase l'autorisent à tout lire/écrire).
+window.previewComme = function(role) {
+  if (currentRole !== "admin" || !currentUser) return;
+  previewRole = role;
+
+  document.querySelectorAll("#preview-bar .pv-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById(`pv-btn-${role}`).classList.add("active");
+
+  showPage(role);
+  updateUserBar(role === "admin" ? currentUserData : { ...currentUserData, role });
+
+  if (role === "etudiant" && !previewInit.etudiant) {
+    previewInit.etudiant = true;
+    initEtudiant(currentUser.uid, currentUserData);
+  }
+  if (role === "prof" && !previewInit.prof) {
+    previewInit.prof = true;
+    initProf();
+  }
+  // "admin" : déjà initialisé au login, rien à refaire.
+};
 
 function showLogin() {
   document.getElementById("form-login").style.display = "block";
@@ -1531,6 +1600,9 @@ async function logout() {
   await signOut(auth);
   document.getElementById("user-bar").classList.remove("visible");
   document.getElementById("succes-overlay").classList.remove("open");
+  document.getElementById("preview-bar").classList.remove("visible");
+  previewRole = null;
+  previewInit = { etudiant: false, prof: false };
 }
 
 // ── ÉTUDIANT ─────────────────────────────────────────────────
