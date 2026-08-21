@@ -739,35 +739,7 @@
 <!-- ============================================================ -->
 <div id="page-prof" class="page">
   <div class="content">
-    <div class="stats-row" id="prof-stats"></div>
-
-    <div class="card">
-      <h3>🏃 Ateliers — où envoyer les étudiants</h3>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:12px">Nombre d'étudiants ayant déjà fait chaque atelier / restant à le faire. Repérez vite les ateliers les moins demandés.</p>
-      <div id="prof-ateliers"><div class="loading">Chargement…</div></div>
-    </div>
-
-    <div class="card">
-      <h3>👥 Étudiants — suivi en direct</h3>
-      <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
-        <select id="filtre-filiere" onchange="filtrerEtudiants()" style="width:auto; margin-bottom:0; flex:1; min-width:160px">
-          <option value="">Toutes les filières</option>
-          <option value="LSO">LSO</option>
-          <option value="MSO">MSO</option>
-          <option value="ESCPI">ESCPI</option>
-          <option value="ENS">ENS</option>
-        </select>
-        <input id="filtre-nom" type="text" placeholder="🔎 Rechercher un nom…" oninput="filtrerEtudiants()" style="width:auto; margin-bottom:0; flex:1; min-width:160px">
-        <select id="filtre-statut" onchange="filtrerEtudiants()" style="width:auto; margin-bottom:0; flex:1; min-width:160px">
-          <option value="">Tous les statuts</option>
-          <option value="arelancer">⚠ À faire valider</option>
-          <option value="encours">⏳ En cours</option>
-          <option value="pasco">○ Pas commencé</option>
-          <option value="valide">✓ Validé</option>
-        </select>
-      </div>
-      <div id="prof-etudiants-list"><div class="loading">Chargement…</div></div>
-    </div>
+    <div id="prof-session-container"><div class="loading">Chargement…</div></div>
   </div>
 </div>
 
@@ -778,6 +750,7 @@
   <div class="tabs">
     <button class="tab active" onclick="showTab('tab-admin-dashboard', this)">Dashboard</button>
     <button class="tab" onclick="showTab('tab-admin-resultats', this)">Résultats</button>
+    <button class="tab" onclick="showTab('tab-admin-sessions', this)">Sessions</button>
     <button class="tab" onclick="showTab('tab-admin-users', this)">Utilisateurs</button>
     <button class="tab" onclick="showTab('tab-admin-tests', this)">Tests</button>
   </div>
@@ -802,6 +775,33 @@
         </select>
       </div>
       <div id="admin-resultats-container"><div class="loading">Chargement…</div></div>
+    </div>
+  </div>
+
+  <!-- Sessions -->
+  <div id="tab-admin-sessions" class="content" style="display:none">
+    <div class="card">
+      <h3>📅 Sessions passées</h3>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:14px">
+        Retrouvez, pour chaque créneau, quels étudiants sont passés, avec quel(s) enseignant(s), à quelle date et heure,
+        et s'ils ont fait tous les tests.
+      </p>
+      <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap">
+        <select id="sess-filtre-encadrant" onchange="renderAdminSessions()" style="width:auto; margin-bottom:0; flex:1; min-width:180px">
+          <option value="">Tous les encadrants</option>
+        </select>
+      </div>
+      <div id="admin-sessions-container"><div class="loading">Chargement…</div></div>
+    </div>
+  </div>
+
+  <!-- Détail d'une session (modale légère) -->
+  <div class="modal-bg" id="modal-session-detail">
+    <div class="modal">
+      <div id="sess-detail-contenu"></div>
+      <div style="display:flex; gap:10px; margin-top:16px">
+        <button class="btn btn-outline" style="flex:1" onclick="fermerSessionDetail()">Fermer</button>
+      </div>
     </div>
   </div>
 
@@ -1087,6 +1087,24 @@ function esc(s){ return String(s ?? "").replace(/&/g,"&amp;").replace(/"/g,"&quo
 function val(id){ const el = document.getElementById(id); return el ? el.value : ""; }
 // Libellés du sexe (stocké en "F"/"H" pour coller aux abaques Femme/Homme du bilan)
 function sexeLabel(s){ return s === "F" ? "Femme" : s === "H" ? "Homme" : "—"; }
+
+// ── Sessions (créneaux en direct) ────────────────────────────
+// Renvoie [id, session] de la session actuellement ouverte, ou null s'il n'y en a pas.
+function sessionOuverte() {
+  const entrees = Object.entries(allSessions).filter(([, s]) => s.statut === "ouverte");
+  if (!entrees.length) return null;
+  entrees.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+  return entrees[0];
+}
+function nomEncadrant() {
+  if (!currentUserData) return "Enseignant";
+  return `${currentUserData.prenom || ""} ${currentUserData.nom || ""}`.trim() || "Enseignant";
+}
+function formatDateFR(iso) {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+}
 function sexeCourt(s){ return s === "F" ? "F" : s === "H" ? "H" : "—"; }
 
 // Charge les tests depuis /tests. En cas d'absence ou d'erreur (droits/offline),
@@ -1258,6 +1276,7 @@ let currentUserData = null;
 let allResultats = {};
 let allUsers    = {};
 let editUID     = null;
+let allSessions = {};                  // sessions (créneaux en direct) : {id: {date, debut, fin, encadrants[], statut, createdAt, closedAt}}
 // Comptes administrateurs (rôle admin attribué automatiquement à l'inscription
 // si l'e-mail figure ici). Pour en ajouter/retirer un, modifier cette liste.
 const ADMIN_EMAILS = [
@@ -1327,7 +1346,6 @@ window.doRegister   = doRegister;
 window.logout       = logout;
 window.showTab      = showTab;
 window.validerSaisie       = validerSaisie;
-window.filtrerEtudiants    = filtrerEtudiants;
 window.adminFiltrerResultats = adminFiltrerResultats;
 window.supprimerEtudiant   = supprimerEtudiant;
 window.ouvrirEdit          = ouvrirEdit;
@@ -1519,8 +1537,48 @@ async function logout() {
 async function initEtudiant(uid, userData) {
   await chargerTests();
   await chargerBaremes();
-  renderTests(uid);
+  // Écoute en direct : dès qu'une session s'ouvre, l'étudiant y est rattaché
+  // automatiquement et voit apparaître ses tests (pas besoin de recharger la page).
+  onValue(ref(db, "sessions"), async snap => {
+    allSessions = snap.exists() ? snap.val() : {};
+    const ouverte = sessionOuverte();
+    if (ouverte) {
+      await rattacherSessionOuverte(uid, ouverte);
+      renderTests(uid);
+    } else {
+      afficherAttenteSession();
+    }
+  });
   chargerMesResultats(uid);
+}
+
+// Affiche un message d'attente tant qu'aucune session n'est ouverte par un enseignant.
+function afficherAttenteSession() {
+  const cont = document.getElementById("tests-container");
+  if (cont) cont.innerHTML = `
+    <div style="text-align:center; padding:30px 10px; color:var(--muted)">
+      <div style="font-size:38px; margin-bottom:10px">⏳</div>
+      <p style="font-size:15px; font-weight:600; color:var(--texte)">En attente du début de la session</p>
+      <p style="font-size:13px; margin-top:6px">Votre enseignant n'a pas encore ouvert la session. Patientez, cette page se mettra à jour automatiquement dès que ce sera prêt.</p>
+    </div>`;
+  const rappel = document.getElementById("rappel-tests");
+  if (rappel) rappel.style.display = "none";
+  const btn = document.querySelector('#tab-saisie .btn-success');
+  if (btn) btn.style.display = "none";
+}
+
+// Rattache l'étudiant à la session ouverte (= il apparaît comme "présent" côté enseignant).
+async function rattacherSessionOuverte(uid, ouverte) {
+  try {
+    const [sessionId] = ouverte;
+    const metaSnap = await get(ref(db, `resultats/${uid}/meta/sessionId`));
+    const sessionActuelle = metaSnap.exists() ? metaSnap.val() : null;
+    if (sessionActuelle !== sessionId) {
+      await update(ref(db, `resultats/${uid}/meta`), { sessionId, presentAt: Date.now() });
+    }
+    const btn = document.querySelector('#tab-saisie .btn-success');
+    if (btn) btn.style.display = "";
+  } catch (e) { /* pas grave si ça échoue, l'étudiant peut quand même saisir ses résultats */ }
 }
 
 let monSexe = null, monAge = null;
@@ -1866,167 +1924,189 @@ function chargerMesResultats(uid) {
 async function initProf() {
   await chargerTests();
   await chargerBaremes();
+  onValue(ref(db, "sessions"), snap => {
+    allSessions = snap.exists() ? snap.val() : {};
+    rejoindreSessionSiOuverte();
+    renderSessionProf();
+  });
   onValue(ref(db, "resultats"), snap => {
     allResultats = snap.exists() ? snap.val() : {};
-    renderProfStats();
-    renderProfAteliers();
-    renderProfEtudiants();
-  });
-  onValue(ref(db, "users"), snap => {
-    allUsers = snap.exists() ? snap.val() : {};
-    renderProfEtudiants();
+    renderSessionProf();
   });
 }
 
-// Statut d'un étudiant : "pasco" | "encours" | "arelancer" | "valide"
-function statutEtudiant(r) {
+// Statut d'un étudiant sur ses tests : "pasco" | "encours" | "termine"
+function statutTestsEtudiant(r) {
   const nbTests = r.tests ? Object.keys(r.tests).length : 0;
-  if (r.meta?.valide === true) return "valide";
-  if (nbTests === 0)            return "pasco";
-  if (nbTests >= TESTS.length)  return "arelancer"; // tout fait mais session non fermée
+  if (nbTests === 0)             return "pasco";
+  if (nbTests >= TESTS.length)   return "termine";
   return "encours";
 }
 
-function profEtudiants() {
-  return Object.entries(allResultats).filter(([, r]) =>
-    r.meta && r.meta.filiere && r.meta.filiere !== ""   // exclure profs/admin
-  );
+// Si une session est ouverte et que le prof connecté n'est pas encore dans la liste
+// des encadrants, on l'y ajoute automatiquement (deux enseignants sur une session
+// est la norme).
+async function rejoindreSessionSiOuverte() {
+  const ouverte = sessionOuverte();
+  if (!ouverte) return;
+  const [id, s] = ouverte;
+  const nom = nomEncadrant();
+  const encadrants = s.encadrants || [];
+  if (!encadrants.includes(nom)) {
+    await update(ref(db, `sessions/${id}`), { encadrants: [...encadrants, nom] });
+  }
 }
 
-function renderProfStats() {
-  const liste = profEtudiants().map(([, r]) => r);
-  const total       = liste.length;
-  const valides     = liste.filter(r => statutEtudiant(r) === "valide").length;
-  const arelancer   = liste.filter(r => statutEtudiant(r) === "arelancer").length;
-  const enCours     = liste.filter(r => statutEtudiant(r) === "encours").length;
-  const pasCommence = liste.filter(r => statutEtudiant(r) === "pasco").length;
-  const accompagner = liste.filter(r => calcVerdict(r).niveau === "accompagner").length;
-  document.getElementById("prof-stats").innerHTML = `
-    <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-label">Étudiants</div></div>
-    <div class="stat-card" style="border-top:3px solid var(--rouge)"><div class="stat-val" style="color:var(--rouge)">${accompagner}</div><div class="stat-label">🚩 À accompagner</div></div>
-    <div class="stat-card" style="border-top:3px solid var(--gris2)"><div class="stat-val" style="color:var(--muted)">${pasCommence}</div><div class="stat-label">○ Pas commencé</div></div>
-    <div class="stat-card" style="border-top:3px solid var(--orange)"><div class="stat-val" style="color:var(--orange)">${enCours}</div><div class="stat-label">⏳ En cours</div></div>
-    <div class="stat-card" style="border-top:3px solid var(--rouge)"><div class="stat-val" style="color:var(--rouge)">${arelancer}</div><div class="stat-label">⚠ À faire valider</div></div>
-    <div class="stat-card" style="border-top:3px solid var(--vert)"><div class="stat-val" style="color:var(--vert)">${valides}</div><div class="stat-label">✓ Validé</div></div>
-  `;
+// Étudiants rattachés à une session donnée
+function etudiantsDeSession(sessionId) {
+  return Object.entries(allResultats).filter(([, r]) => r.meta && r.meta.sessionId === sessionId);
 }
 
-function renderProfAteliers() {
-  const container = document.getElementById("prof-ateliers");
-  if (!container) return;
-  const liste = profEtudiants().map(([, r]) => r);
-  const total = liste.length;
-  if (total === 0) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun étudiant.</p>"; return; }
+window.demarrerSession = async function() {
+  const date  = document.getElementById("sess-date").value;
+  const debut = document.getElementById("sess-debut").value;
+  if (!date || !debut) { alert("Merci d'indiquer la date et l'heure de début."); return; }
+  // Anti-collision : une session a peut-être été ouverte entre-temps par un collègue.
+  const snap = await get(ref(db, "sessions"));
+  allSessions = snap.exists() ? snap.val() : {};
+  const dejaOuverte = sessionOuverte();
+  if (dejaOuverte) {
+    alert("Une session est déjà en cours. Vous allez la rejoindre en tant qu'encadrant.");
+    await rejoindreSessionSiOuverte();
+    renderSessionProf();
+    return;
+  }
+  const id = "s" + Date.now();
+  await set(ref(db, `sessions/${id}`), {
+    date, debut, fin: "",
+    encadrants: [nomEncadrant()],
+    statut: "ouverte",
+    createdAt: Date.now(),
+    closedAt: null
+  });
+};
 
-  container.innerHTML = TESTS.map(t => {
-    const faits = liste.filter(r => r.tests && r.tests[t.id]).length;
-    const reste = total - faits;
-    const pct   = total ? Math.round(faits / total * 100) : 0;
-    return `
-      <div class="atelier-row">
-        <div class="atelier-head">
-          <span><strong>${t.nom}</strong></span>
-          <span style="color:var(--muted)">fait ${faits} · <span style="color:var(--rouge)">reste ${reste}</span></span>
-        </div>
-        <div class="atelier-bar"><div class="atelier-fill" style="width:${pct}%"></div></div>
+window.ajusterSession = async function(id) {
+  const s = allSessions[id]; if (!s) return;
+  const date  = document.getElementById("sess-edit-date").value;
+  const debut = document.getElementById("sess-edit-debut").value;
+  const fin   = document.getElementById("sess-edit-fin").value;
+  if (!date || !debut) { alert("Date et heure de début requises."); return; }
+  await update(ref(db, `sessions/${id}`), { date, debut, fin: fin || "" });
+};
+
+window.terminerSession = async function(id) {
+  const s = allSessions[id]; if (!s) return;
+  const etudiants = etudiantsDeSession(id).map(([, r]) => r);
+  const total = etudiants.length;
+  const tousFaits = etudiants.filter(r => statutTestsEtudiant(r) === "termine").length;
+  const tousValides = etudiants.filter(r => r.meta?.valide === true).length;
+  const msg = `Vérifiez que tous les étudiants ont bien fait tous les tests avant de terminer la session.\n\n`
+    + `${tousFaits}/${total} étudiants ont fini leurs tests · ${tousValides}/${total} ont validé leur bilan.\n\n`
+    + `Terminer quand même la session ?`;
+  if (!confirm(msg)) return;
+  const finProposee = new Date().toTimeString().slice(0, 5);
+  const fin = prompt("Heure de fin du créneau :", s.fin || finProposee);
+  if (fin === null) return;
+  await update(ref(db, `sessions/${id}`), { statut: "terminee", fin, closedAt: Date.now() });
+};
+
+function renderSessionProf() {
+  const cont = document.getElementById("prof-session-container");
+  if (!cont) return;
+  const ouverte = sessionOuverte();
+
+  if (!ouverte) {
+    const aujourdHui = new Date().toISOString().slice(0, 10);
+    const maintenant = new Date().toTimeString().slice(0, 5);
+    cont.innerHTML = `
+      <div class="card">
+        <h3>▶️ Démarrer une session</h3>
+        <p style="font-size:13px; color:var(--muted); margin-bottom:14px">
+          Aucune session en cours. Dès que vous démarrez une session, les étudiants qui se connectent
+          apparaissent automatiquement ici comme présents.
+        </p>
+        <label style="font-size:13px;font-weight:600">Date</label>
+        <input type="date" id="sess-date" value="${aujourdHui}" style="margin-bottom:10px">
+        <label style="font-size:13px;font-weight:600">Heure de début</label>
+        <input type="time" id="sess-debut" value="${maintenant}" style="margin-bottom:14px">
+        <button class="btn btn-primary" onclick="demarrerSession()">▶️ Démarrer la session</button>
       </div>`;
-  }).join("");
-}
+    return;
+  }
 
-function filtrerEtudiants() { renderProfEtudiants(); }
+  const [id, s] = ouverte;
+  const etudiants = etudiantsDeSession(id);
+  const total = etudiants.length;
+  const pasCommence = etudiants.filter(([, r]) => statutTestsEtudiant(r) === "pasco").length;
+  const enCours      = etudiants.filter(([, r]) => statutTestsEtudiant(r) === "encours").length;
+  const termine       = etudiants.filter(([, r]) => statutTestsEtudiant(r) === "termine").length;
+  const valides        = etudiants.filter(([, r]) => r.meta?.valide === true).length;
 
-function renderProfEtudiants() {
-  const filtreFil = document.getElementById("filtre-filiere")?.value || "";
-  const filtreNom = (document.getElementById("filtre-nom")?.value || "").toLowerCase().trim();
-  const filtreSt  = document.getElementById("filtre-statut")?.value || "";
-  const container = document.getElementById("prof-etudiants-list");
-  if (!container) return;
+  etudiants.sort(([, a], [, b]) => `${a.meta?.nom||""}`.localeCompare(`${b.meta?.nom||""}`));
 
-  let rows = profEtudiants().filter(([, r]) => {
-    if (filtreFil && r.meta.filiere !== filtreFil) return false;
-    if (filtreSt  && statutEtudiant(r) !== filtreSt) return false;
-    if (filtreNom) {
-      const nomComplet = `${r.meta.prenom || ""} ${r.meta.nom || ""}`.toLowerCase();
-      if (!nomComplet.includes(filtreNom)) return false;
-    }
-    return true;
-  });
-
-  if (rows.length === 0) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun résultat.</p>"; return; }
-
-  // Tri par priorité : à accompagner d'abord, puis à relancer, en cours, pas commencé, validé
-  const ordre = { arelancer: 1, encours: 2, pasco: 3, valide: 4 };
-  rows.sort(([, a], [, b]) => {
-    const va = calcVerdict(a), vb = calcVerdict(b);
-    const pa = (va.niveau === "accompagner") ? 0 : ordre[statutEtudiant(a)];
-    const pb = (vb.niveau === "accompagner") ? 0 : ordre[statutEtudiant(b)];
-    if (pa !== pb) return pa - pb;
-    if (pa === 0 && vb.nRouge !== va.nRouge) return vb.nRouge - va.nRouge; // plus de rouges en tête
-    return `${a.meta.nom||""}`.localeCompare(`${b.meta.nom||""}`);
-  });
-
-  container.innerHTML = rows.map(([uid, r]) => {
-    const meta    = r.meta || {};
-    const tests   = r.tests || {};
-    const nbTests = Object.keys(tests).length;
-    const st      = statutEtudiant(r);
-    const verdict = calcVerdict(r);
-    const aBesoin = verdict.niveau === "accompagner";
-
-    // Ateliers restants (pour guider l'étudiant)
-    const restants = TESTS.filter(t => tests[t.id] === undefined).map(t => t.nom);
-    let resteHTML = "";
-    if (st === "encours" && restants.length) {
-      resteHTML = `<div class="reste-tags">À faire : ${restants.map(n => `<span class="reste-tag">${n}</span>`).join("")}</div>`;
-    }
-
-    // Badge en haut à droite : verdict si dispo, sinon statut d'avancement
+  const lignes = etudiants.map(([uid, r]) => {
+    const meta = r.meta || {};
+    const tests = r.tests || {};
+    const nb = Object.keys(tests).length;
+    const st = statutTestsEtudiant(r);
     let badge;
-    if (verdict.niveau !== "vide") {
-      const col = COULEURS[verdict.couleur];
-      badge = `<span class="vbadge" style="background:${COULEUR_CLAIR[verdict.couleur]};color:${col.hex}">${col.emoji} ${verdict.titre}</span>`;
-    } else if (st === "encours") {
-      badge = `<span class="vbadge" style="background:var(--or-cl);color:var(--orange)">⏳ En cours</span>`;
-    } else {
-      badge = `<span class="vbadge" style="background:var(--gris);color:var(--muted)">○ Pas commencé</span>`;
-    }
+    if (r.meta?.valide) badge = `<span class="vbadge" style="background:var(--vert-cl);color:var(--vert)">✓ Validé par l'étudiant</span>`;
+    else if (st === "termine") badge = `<span class="vbadge" style="background:var(--or-cl);color:var(--orange)">⚠ Tests finis, pas encore validé</span>`;
+    else if (st === "encours") badge = `<span class="vbadge" style="background:var(--or-cl);color:var(--orange)">⏳ En cours</span>`;
+    else badge = `<span class="vbadge" style="background:var(--gris);color:var(--muted)">○ Pas commencé</span>`;
 
-    // Ligne d'avancement
-    let prog;
-    if (nbTests === 0)               prog = `Pas encore commencé`;
-    else if (nbTests < TESTS.length) prog = `Saisie partielle · <b>${nbTests}/${TESTS.length} tests</b>`;
-    else                             prog = `Bilan complet · <b>${TESTS.length}/${TESTS.length} tests</b>`;
-    if (verdict.nRouge > 0)          prog += ` · <span style="color:var(--rouge)">${verdict.nRouge} en rouge</span>`;
+    const restants = TESTS.filter(t => tests[t.id] === undefined).map(t => t.nom);
+    const resteHTML = (st !== "termine" && restants.length)
+      ? `<div class="reste-tags">À faire : ${restants.map(n => `<span class="reste-tag">${n}</span>`).join("")}</div>` : "";
 
-    // Action / statut de validation
-    let bas = "";
-    if (meta.valide) {
-      const quand = meta.validatedAt ? new Date(meta.validatedAt).toLocaleDateString("fr-FR", {day:"2-digit",month:"2-digit"}) : "";
-      bas = `
-        <div class="statusline"><span class="dotsmall" style="background:var(--vert)"></span> Validé${meta.valideParNom ? " par " + esc(meta.valideParNom) : ""}${quand ? " · " + quand : ""}</div>
-        <button class="btn-full dev" onclick="profDevalider('${uid}')">↩ Dévalider</button>`;
-    } else if (nbTests > 0) {
-      bas = `<button class="btn-full val" onclick="profValider('${uid}')">✓ Valider le bilan</button>`;
-    }
+    const actionValidation = !r.meta?.valide
+      ? `<button class="btn-full val" style="margin-top:8px" onclick="profValider('${uid}')">✓ Valider à la place de l'étudiant</button>` : "";
 
     return `
-      <div class="scard ${aBesoin ? "attn" : ""}">
+      <div class="scard">
         <div class="shead">
           <div>
-            <div class="student-name">${aBesoin ? "🚩 " : ""}${esc(meta.prenom || "")} ${esc(meta.nom || "")}</div>
-            <div class="smeta-row">
-              <span class="filiere-tag">${meta.filiere || "—"}</span>
-              <span class="filiere-tag" style="background:var(--bleu-cl);color:var(--bleu)">${sexeLabel(meta.sexe)}</span>
-            </div>
+            <div class="student-name">${esc(meta.prenom || "")} ${esc(meta.nom || "")}</div>
+            <div class="smeta-row"><span class="filiere-tag">${meta.filiere || "—"}</span></div>
           </div>
           ${badge}
         </div>
-        <div class="prog">${prog}</div>
+        <div class="prog">${nb}/${TESTS.length} tests faits</div>
         ${resteHTML}
-        ${bas}
+        ${actionValidation}
+      </div>`;
+  }).join("") || `<p style="color:var(--muted);font-size:13px">Aucun étudiant connecté pour l'instant sur cette session.</p>`;
+
+  cont.innerHTML = `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:10px">
+        <div>
+          <h3 style="margin:0 0 4px">🟢 Session en cours</h3>
+          <div style="font-size:13px;color:var(--muted)">${formatDateFR(s.date)} · ${esc(s.debut)}${s.fin ? " – " + esc(s.fin) : ""}</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:2px">👤 Encadrants : ${(s.encadrants || []).map(esc).join(", ")}</div>
+        </div>
+        <button class="btn btn-outline" style="width:auto;padding:8px 14px;font-size:13px" onclick="terminerSession('${id}')">⏹ Terminer la session</button>
       </div>
-    `;
-  }).join("");
+      <details style="margin-bottom:10px">
+        <summary style="cursor:pointer;font-size:13px;color:var(--muted)">✏️ Ajuster la date / l'heure de ce créneau</summary>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+          <div><label style="font-size:12px;font-weight:600">Date</label><input type="date" id="sess-edit-date" value="${s.date}" style="margin-bottom:0"></div>
+          <div><label style="font-size:12px;font-weight:600">Début</label><input type="time" id="sess-edit-debut" value="${s.debut}" style="margin-bottom:0"></div>
+          <div><label style="font-size:12px;font-weight:600">Fin</label><input type="time" id="sess-edit-fin" value="${s.fin || ""}" style="margin-bottom:0"></div>
+        </div>
+        <button class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:13px;margin-top:8px" onclick="ajusterSession('${id}')">Enregistrer</button>
+      </details>
+      <div class="stats-row" style="margin-bottom:14px">
+        <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-label">Présents</div></div>
+        <div class="stat-card" style="border-top:3px solid var(--gris2)"><div class="stat-val" style="color:var(--muted)">${pasCommence}</div><div class="stat-label">○ Pas commencé</div></div>
+        <div class="stat-card" style="border-top:3px solid var(--orange)"><div class="stat-val" style="color:var(--orange)">${enCours}</div><div class="stat-label">⏳ En cours</div></div>
+        <div class="stat-card" style="border-top:3px solid var(--orange)"><div class="stat-val" style="color:var(--orange)">${termine}</div><div class="stat-label">✓ Tests finis</div></div>
+        <div class="stat-card" style="border-top:3px solid var(--vert)"><div class="stat-val" style="color:var(--vert)">${valides}</div><div class="stat-label">✓ Validés</div></div>
+      </div>
+      <h3 style="margin-bottom:10px">👥 Étudiants — live</h3>
+      ${lignes}
+    </div>`;
 }
 
 // ── ADMIN ─────────────────────────────────────────────────────
@@ -2048,12 +2128,105 @@ async function initAdmin() {
     allResultats = snap.exists() ? snap.val() : {};
     renderAdminStats();
     renderAdminResultats();
+    renderAdminSessions();
   });
   onValue(ref(db, "users"), snap => {
     allUsers = snap.exists() ? snap.val() : {};
     renderAdminUsers();
   });
+  onValue(ref(db, "sessions"), snap => {
+    allSessions = snap.exists() ? snap.val() : {};
+    remplirFiltreEncadrantSessions();
+    renderAdminSessions();
+  });
 }
+
+// ── Sessions (vue admin) ────────────────────────────────────
+function remplirFiltreEncadrantSessions() {
+  const sel = document.getElementById("sess-filtre-encadrant");
+  if (!sel) return;
+  const actuel = sel.value;
+  const noms = new Set();
+  Object.values(allSessions).forEach(s => (s.encadrants || []).forEach(e => noms.add(e)));
+  sel.innerHTML = `<option value="">Tous les encadrants</option>` +
+    [...noms].sort().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  sel.value = actuel;
+}
+
+function etudiantsSession(sessionId) {
+  return Object.entries(allResultats).filter(([, r]) => r.meta && r.meta.sessionId === sessionId);
+}
+
+function renderAdminSessions() {
+  const cont = document.getElementById("admin-sessions-container");
+  if (!cont) return;
+  const filtreEnc = document.getElementById("sess-filtre-encadrant")?.value || "";
+
+  let entrees = Object.entries(allSessions);
+  if (filtreEnc) entrees = entrees.filter(([, s]) => (s.encadrants || []).includes(filtreEnc));
+  entrees.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+
+  if (!entrees.length) { cont.innerHTML = `<p style="color:var(--muted);font-size:13px">Aucune session pour l'instant.</p>`; return; }
+
+  cont.innerHTML = entrees.map(([id, s]) => {
+    const etus = etudiantsSession(id);
+    const total = etus.length;
+    const tousFaits = etus.filter(([, r]) => (r.tests ? Object.keys(r.tests).length : 0) >= TESTS.length).length;
+    const valides = etus.filter(([, r]) => r.meta?.valide === true).length;
+    const enCours = s.statut === "ouverte";
+    return `
+      <div class="scard" style="cursor:pointer" onclick="ouvrirSessionDetail('${id}')">
+        <div class="shead">
+          <div>
+            <div class="student-name">${formatDateFR(s.date)}</div>
+            <div class="smeta-row">
+              <span class="filiere-tag">${esc(s.debut || "")}${s.fin ? " – " + esc(s.fin) : ""}</span>
+              <span class="filiere-tag" style="background:var(--bleu-cl);color:var(--bleu)">${(s.encadrants || []).map(esc).join(", ") || "—"}</span>
+            </div>
+          </div>
+          ${enCours
+            ? `<span class="vbadge" style="background:var(--or-cl);color:var(--orange)">🟢 En cours</span>`
+            : `<span class="vbadge" style="background:var(--vert-cl);color:var(--vert)">✓ Terminée</span>`}
+        </div>
+        <div class="prog">${total} étudiant${total>1?"s":""} · ${tousFaits}/${total} ont fini tous les tests · ${valides}/${total} ont validé</div>
+      </div>`;
+  }).join("");
+}
+window.renderAdminSessions = renderAdminSessions;
+
+function ouvrirSessionDetail(id) {
+  const s = allSessions[id]; if (!s) return;
+  const etus = etudiantsSession(id).sort(([, a], [, b]) => `${a.meta?.nom||""}`.localeCompare(`${b.meta?.nom||""}`));
+  const lignes = etus.map(([uid, r]) => {
+    const meta = r.meta || {};
+    const nb = r.tests ? Object.keys(r.tests).length : 0;
+    const complet = nb >= TESTS.length;
+    const statutHTML = r.meta?.valide
+      ? `<span class="badge-ok">✓ Validé</span>`
+      : complet
+        ? `<span class="vbadge" style="background:var(--or-cl);color:var(--orange)">⚠ Fini, non validé</span>`
+        : `<span class="vbadge" style="background:var(--gris);color:var(--muted)">${nb}/${TESTS.length} tests</span>`;
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--gris2)">
+        <div>
+          <strong>${esc(meta.prenom || "")} ${esc(meta.nom || "")}</strong>
+          <span style="color:var(--muted);font-size:12px"> · ${meta.filiere || "—"}</span>
+        </div>
+        ${statutHTML}
+      </div>`;
+  }).join("") || `<p style="color:var(--muted);font-size:13px">Aucun étudiant sur cette session.</p>`;
+
+  document.getElementById("sess-detail-contenu").innerHTML = `
+    <h3 style="margin-bottom:6px">📅 ${formatDateFR(s.date)}</h3>
+    <p style="font-size:14px;margin-bottom:4px"><strong>${esc(s.debut || "")}${s.fin ? " – " + esc(s.fin) : ""}</strong></p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">👤 ${(s.encadrants || []).map(esc).join(", ") || "Aucun encadrant"}</p>
+    <div>${lignes}</div>`;
+  document.getElementById("modal-session-detail").classList.add("open");
+}
+window.ouvrirSessionDetail = ouvrirSessionDetail;
+
+function fermerSessionDetail() { document.getElementById("modal-session-detail").classList.remove("open"); }
+window.fermerSessionDetail = fermerSessionDetail;
 
 function renderAdminStats() {
   // Ne compter que les vrais étudiants (filière renseignée = L1)
