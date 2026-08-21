@@ -789,6 +789,7 @@
     <button class="tab" onclick="showTab('tab-admin-sessions', this)">Sessions</button>
     <button class="tab" onclick="showTab('tab-admin-users', this)">Utilisateurs</button>
     <button class="tab" onclick="showTab('tab-admin-tests', this)">Tests</button>
+    <button class="tab" onclick="showTab('tab-admin-demo', this)">🧪 Démo</button>
   </div>
 
   <!-- Dashboard -->
@@ -858,6 +859,44 @@
         à leur prochaine connexion. Supprimer un test masque simplement ses anciennes valeurs (elles ne sont pas effacées).
       </p>
       <div id="admin-tests-container"><div class="loading">Chargement…</div></div>
+    </div>
+  </div>
+
+  <!-- Démo -->
+  <div id="tab-admin-demo" class="content" style="display:none">
+    <div class="card">
+      <h3>🧪 Générer des données de démo</h3>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:10px">
+        Génère un jeu de données fictives — étudiants, enseignants, sessions et résultats — pour tester l'appli
+        « en conditions réelles » (Dashboard, Résultats, Sessions, calcul des verdicts…) sans utiliser de vrais comptes.
+      </p>
+      <ul style="font-size:13px; color:var(--muted); margin:0 0 14px 18px; padding:0">
+        <li>Les comptes créés utilisent des emails fictifs (@dauphine.eu) et sont marqués « démo » — invisibles pour les vrais utilisateurs.</li>
+        <li>Les résultats générés respectent les barèmes officiels (répartition variée de rouge à bleu), pour tester aussi les calculs de verdict.</li>
+        <li>Limite technique : les comptes de connexion créés (Firebase Auth) ne peuvent pas être supprimés depuis cette page — seules leurs données (profil + résultats) le sont. Ça reste totalement invisible dans l'appli.</li>
+      </ul>
+      <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px">
+        <div>
+          <label style="font-size:13px;font-weight:600">Nombre d'étudiants fictifs</label>
+          <input type="number" id="demo-nb-etudiants" value="20" min="1" max="60" style="margin-bottom:0; width:120px">
+        </div>
+        <div>
+          <label style="font-size:13px;font-weight:600">Nombre d'enseignants fictifs</label>
+          <input type="number" id="demo-nb-profs" value="2" min="1" max="6" style="margin-bottom:0; width:120px">
+        </div>
+      </div>
+      <button class="btn btn-primary" id="demo-btn-generer" onclick="genererDonneesDemo()">🎲 Générer les données de démo</button>
+      <div id="demo-progress" style="margin-top:12px; font-size:13px; color:var(--muted)"></div>
+    </div>
+
+    <div class="card">
+      <h3>🧹 Nettoyer les données de démo</h3>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:14px">
+        Supprime tous les étudiants, enseignants, résultats et sessions marqués « démo ». Les vrais utilisateurs
+        et leurs données ne sont jamais concernés.
+      </p>
+      <div id="demo-compte" style="font-size:13px; margin-bottom:12px; color:var(--muted)"></div>
+      <button class="btn btn-outline" onclick="nettoyerDonneesDemo()">🧹 Supprimer toutes les données de démo</button>
     </div>
   </div>
 </div>
@@ -2205,11 +2244,13 @@ async function initAdmin() {
   onValue(ref(db, "users"), snap => {
     allUsers = snap.exists() ? snap.val() : {};
     renderAdminUsers();
+    renderDemoCompte();
   });
   onValue(ref(db, "sessions"), snap => {
     allSessions = snap.exists() ? snap.val() : {};
     remplirFiltreEncadrantSessions();
     renderAdminSessions();
+    renderDemoCompte();
   });
 }
 
@@ -2299,6 +2340,216 @@ window.ouvrirSessionDetail = ouvrirSessionDetail;
 
 function fermerSessionDetail() { document.getElementById("modal-session-detail").classList.remove("open"); }
 window.fermerSessionDetail = fermerSessionDetail;
+
+// ── Démo (admin) : générer / nettoyer un jeu de données fictives ─────────
+const DEMO_PRENOMS_F = ["Léa","Camille","Chloé","Emma","Manon","Inès","Sarah","Zoé","Julie","Alice"];
+const DEMO_PRENOMS_H = ["Lucas","Hugo","Nathan","Louis","Adam","Tom","Enzo","Rayan","Léo","Jules"];
+const DEMO_NOMS = ["Martin","Bernard","Petit","Robert","Richard","Durand","Dubois","Moreau","Laurent","Simon","Michel","Lefebvre","Leroy","Roux","David"];
+
+function demoAleatoire(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function dateDecalee(deltaJours) {
+  const d = new Date();
+  d.setDate(d.getDate() + deltaJours);
+  return d.toISOString().slice(0, 10);
+}
+
+// Choisit une couleur cible avec une répartition volontairement variée
+// (pour voir tous les cas de figure une fois les données générées).
+function demoCouleurCible() {
+  const pool = ["rouge", "orange", "jaune", "jaune", "vert", "vert", "vert", "bleu", "bleu"];
+  return demoAleatoire(pool);
+}
+
+// Génère une valeur de test réaliste qui correspond à la couleur cible dans le barème.
+function genererValeurTest(test, sexe, age) {
+  const b = BAREMES[test.code];
+  if (!b) return null;
+  const cible = demoCouleurCible();
+
+  if (b.kind === "choix") {
+    const opts = (b.options || []).filter(o => o.couleur === cible);
+    const o = opts[0] || demoAleatoire(b.options || []);
+    return o ? o.cle : null;
+  }
+  if (b.kind === "imc") {
+    let prevMax = 10;
+    for (const bande of b.bandes) {
+      if (bande.couleur === cible) {
+        const max = Math.min(bande.max, prevMax + 12) - 0.2;
+        return +(prevMax + Math.random() * Math.max(0.5, max - prevMax)).toFixed(1);
+      }
+      prevMax = bande.max;
+    }
+    return 22.0;
+  }
+
+  let seuils;
+  const sens = b.sens;
+  if (b.kind === "universel") seuils = b.seuils;
+  else if (b.kind === "ageSexe") {
+    const sx = sexe === "H" ? "H" : "F";
+    const tr = trancheAge(age, b.tranches);
+    seuils = (b.tranches[tr] && b.tranches[tr][sx]) || Object.values(b.tranches)[0][sx];
+  }
+  if (!seuils) return null;
+  const [s1, s2, s3, s4] = seuils;
+  const marge = Math.max(2, s1 * 0.15);
+  let min, max;
+  if (sens === "haut") {
+    if (cible === "rouge")       { min = Math.max(0, s1 - marge * 2); max = s1; }
+    else if (cible === "orange") { min = s1; max = s2; }
+    else if (cible === "jaune")  { min = s2; max = s3; }
+    else if (cible === "vert")   { min = s3; max = s4; }
+    else                          { min = s4; max = s4 + marge * 2; }
+  } else {
+    if (cible === "bleu")        { min = Math.max(0, s1 - marge); max = s1; }
+    else if (cible === "vert")   { min = s1; max = s2; }
+    else if (cible === "jaune")  { min = s2; max = s3; }
+    else if (cible === "orange") { min = s3; max = s4; }
+    else                          { min = s4; max = s4 + marge * 2; }
+  }
+  if (max <= min) max = min + 1;
+  const v = min + Math.random() * (max - min);
+  return Math.round(v * 10) / 10;
+}
+
+// Statut cible pour un étudiant fictif (variété de cas côté prof/admin).
+function demoStatutCible() {
+  const pool = ["pasco", "encours", "encours", "termine", "termine", "valide", "valide", "valide", "valide"];
+  return demoAleatoire(pool);
+}
+
+window.genererDonneesDemo = async function() {
+  const nbEtudiants = Math.max(1, Math.min(60, parseInt(document.getElementById("demo-nb-etudiants").value, 10) || 20));
+  const nbProfs     = Math.max(1, Math.min(6,  parseInt(document.getElementById("demo-nb-profs").value, 10) || 2));
+  const btn = document.getElementById("demo-btn-generer");
+  const prog = document.getElementById("demo-progress");
+  btn.disabled = true;
+  const total = nbProfs + nbEtudiants;
+  let fait = 0;
+  const majProg = (texte) => { prog.textContent = `${texte} (${fait}/${total})`; };
+
+  const timestamp = Date.now();
+  const secondaryApp = initializeApp(firebaseConfig, "demo-" + timestamp);
+  const secondaryAuth = getAuth(secondaryApp);
+  const MOTDEPASSE_DEMO = "DemoTest" + timestamp.toString().slice(-4) + "!";
+
+  try {
+    // 1. Enseignants fictifs
+    const profs = [];
+    for (let i = 0; i < nbProfs; i++) {
+      majProg("Création des enseignants…");
+      const sexe = Math.random() < 0.5 ? "F" : "H";
+      const prenom = demoAleatoire(sexe === "F" ? DEMO_PRENOMS_F : DEMO_PRENOMS_H);
+      const nom = demoAleatoire(DEMO_NOMS);
+      const email = `demo.prof${i + 1}.${timestamp}@dauphine.eu`;
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, email, MOTDEPASSE_DEMO);
+      const uid = cred.user.uid;
+      await set(ref(db, `users/${uid}`), {
+        prenom, nom, email, role: "prof", filiere: "", sexe, anneeNaissance: null,
+        createdAt: Date.now(), demo: true
+      });
+      await signOut(secondaryAuth);
+      profs.push({ uid, nom: `${prenom} ${nom}` });
+      fait++; majProg("Création des enseignants…");
+    }
+
+    // 2. Sessions "terminées" encadrées par ces enseignants
+    const nbSessions = nbProfs >= 2 ? 2 : 1;
+    const sessionIds = [];
+    for (let i = 0; i < nbSessions; i++) {
+      const id = `sdemo${timestamp}-${i}`;
+      const encadrants = nbSessions === 1 ? profs.map(p => p.nom) : [profs[i % profs.length].nom];
+      await set(ref(db, `sessions/${id}`), {
+        date: dateDecalee(-(i + 1)), debut: "09:00", fin: "10:30",
+        encadrants, statut: "terminee",
+        createdAt: Date.now() - (i + 1) * 100000, closedAt: Date.now() - (i + 1) * 90000,
+        demo: true
+      });
+      sessionIds.push(id);
+    }
+
+    // 3. Étudiants fictifs + résultats réalistes
+    const filieres = ["LSO", "MSO", "ESCPI", "ENS"];
+    for (let i = 0; i < nbEtudiants; i++) {
+      majProg("Création des étudiants…");
+      const sexe = Math.random() < 0.5 ? "F" : "H";
+      const prenom = demoAleatoire(sexe === "F" ? DEMO_PRENOMS_F : DEMO_PRENOMS_H);
+      const nom = demoAleatoire(DEMO_NOMS);
+      const filiere = filieres[i % filieres.length];
+      const annee = new Date().getFullYear() - (18 + Math.floor(Math.random() * 8));
+      const age = ageDepuis(annee);
+      const email = `demo.etudiant${i + 1}.${timestamp}@dauphine.eu`;
+
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, email, MOTDEPASSE_DEMO);
+      const uid = cred.user.uid;
+      await set(ref(db, `users/${uid}`), {
+        prenom, nom, email, role: "etudiant", filiere, sexe, anneeNaissance: annee,
+        createdAt: Date.now(), demo: true
+      });
+
+      const statut = demoStatutCible();
+      const testsAFaire = statut === "pasco" ? []
+        : statut === "encours" ? TESTS.slice(0, Math.max(1, Math.ceil(TESTS.length * (0.3 + Math.random() * 0.4))))
+        : TESTS;
+      const testsData = {};
+      testsAFaire.forEach(t => {
+        const v = genererValeurTest(t, sexe, age);
+        if (v !== null && v !== undefined) testsData[t.id] = v;
+      });
+
+      await set(ref(db, `resultats/${uid}`), {
+        meta: {
+          prenom, nom, email, filiere, sexe, anneeNaissance: annee,
+          session: new Date().toISOString().slice(0, 7),
+          valide: statut === "valide",
+          sessionId: sessionIds[i % sessionIds.length],
+          presentAt: Date.now(), createdAt: Date.now(), demo: true
+        },
+        tests: testsData
+      });
+      await signOut(secondaryAuth);
+      fait++; majProg("Création des étudiants…");
+    }
+
+    prog.textContent = `✓ Terminé : ${nbProfs} enseignant(s) et ${nbEtudiants} étudiant(s) fictifs créés.`;
+  } catch (e) {
+    prog.textContent = "Erreur pendant la génération : " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+function renderDemoCompte() {
+  const el = document.getElementById("demo-compte");
+  if (!el) return;
+  const nbUsers = Object.values(allUsers).filter(u => u.demo === true).length;
+  const nbSessions = Object.values(allSessions).filter(s => s.demo === true).length;
+  el.textContent = nbUsers || nbSessions
+    ? `Actuellement : ${nbUsers} utilisateur(s) de démo et ${nbSessions} session(s) de démo.`
+    : `Aucune donnée de démo actuellement.`;
+}
+window.renderDemoCompte = renderDemoCompte;
+
+window.nettoyerDonneesDemo = async function() {
+  const usersADemo = Object.entries(allUsers).filter(([, u]) => u.demo === true);
+  const sessionsADemo = Object.entries(allSessions).filter(([, s]) => s.demo === true);
+  if (!usersADemo.length && !sessionsADemo.length) { alert("Aucune donnée de démo à supprimer."); return; }
+  if (!confirm(`Supprimer ${usersADemo.length} utilisateur(s) de démo et ${sessionsADemo.length} session(s) de démo ?`)) return;
+  try {
+    for (const [uid] of usersADemo) {
+      await remove(ref(db, `users/${uid}`));
+      await remove(ref(db, `resultats/${uid}`));
+    }
+    for (const [id] of sessionsADemo) {
+      await remove(ref(db, `sessions/${id}`));
+    }
+    alert("Données de démo supprimées.");
+  } catch (e) {
+    alert("Erreur pendant le nettoyage : " + e.message);
+  }
+};
 
 function renderAdminStats() {
   // Ne compter que les vrais étudiants (filière renseignée = L1)
@@ -2411,7 +2662,7 @@ function renderAdminUsers() {
   container.innerHTML = `
     <table class="admin-table">
       <thead><tr>
-        <th>Nom</th><th>Email</th><th>Rôle</th><th>Filière</th><th>Sexe</th><th>Action</th>
+        <th>Nom</th><th>Email</th><th>Rôle</th><th>Filière</th><th>Sexe</th><th>Inscrit le</th><th>Action</th>
       </tr></thead>
       <tbody>
         ${rows.map(([uid, u]) => `
@@ -2442,6 +2693,9 @@ function renderAdminUsers() {
               </select>
             </td>
             <td><span style="font-size:11px;color:var(--muted)">${new Date(u.createdAt||0).toLocaleDateString("fr-FR")}</span></td>
+            <td>${uid === currentUser?.uid
+              ? `<span style="font-size:11px;color:var(--muted)">(vous)</span>`
+              : `<button class="btn btn-danger btn-sm" onclick="supprimerUtilisateur('${uid}')" title="Supprimer">🗑️</button>`}</td>
           </tr>
         `).join("")}
       </tbody>
@@ -2703,6 +2957,24 @@ Cette action est irréversible.`)) return;
 }
 
 window.supprimerEtudiant = supprimerEtudiant;
+
+// Suppression depuis l'onglet "Utilisateurs" — fonctionne pour étudiant, prof ou admin.
+async function supprimerUtilisateur(uid) {
+  const u = allUsers[uid] || {};
+  const nom = `${u.prenom || ""} ${u.nom || ""}`.trim() || "cet utilisateur";
+  if (uid === currentUser?.uid) { alert("Vous ne pouvez pas supprimer votre propre compte."); return; }
+  if (!confirm(`Supprimer définitivement ${nom} (${u.email || ""}) ?\n\nCette action est irréversible.`)) return;
+  try {
+    await remove(ref(db, `users/${uid}`));
+    await remove(ref(db, `resultats/${uid}`));
+    // Note : le compte de connexion Firebase Auth ne peut pas être supprimé depuis le
+    // client. Pour libérer complètement l'email, le supprimer aussi dans
+    // Firebase Console > Authentication.
+  } catch (e) {
+    alert("Erreur lors de la suppression : " + e.message);
+  }
+}
+window.supprimerUtilisateur = supprimerUtilisateur;
 
 async function adminValider(uid) {
   const meta = allResultats[uid]?.meta || {};
