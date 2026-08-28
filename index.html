@@ -3192,17 +3192,24 @@ function ouvrirBareme(code) {
   let corps = "";
 
   if (b.kind === "universel") {
+    const ordreCouleurs = b.sens === "bas" ? "🔵 🟢 🟡 🟠 🔴" : "🔴 🟠 🟡 🟢 🔵";
     corps = `
-      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">${sensTxt} — 4 seuils → 5 couleurs (🔴 🟠 🟡 🟢 🔵)</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">${sensTxt} — 4 seuils → 5 couleurs, dans l'ordre des valeurs croissantes : ${ordreCouleurs}</p>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${b.seuils.map((s,i)=>`<input type="number" step="any" id="bar_${code}_u_${i}" value="${s}" style="width:80px;padding:7px;margin:0">`).join('<span style="color:var(--muted)">‹</span>')}
       </div>`;
   } else if (b.kind === "ageSexe") {
     const tranches = Object.keys(b.tranches);
+    // Ordre des en-têtes de seuils : dépend du sens du test.
+    //  - sens "haut" (plus haut = mieux)  : s1=🔴/🟠, s2=🟠/🟡, s3=🟡/🟢, s4=🟢/🔵
+    //  - sens "bas"  (plus bas  = mieux)  : s1=🔵/🟢, s2=🟢/🟡, s3=🟡/🟠, s4=🟠/🔴
+    const entetes = b.sens === "bas"
+      ? ["🔵/🟢", "🟢/🟡", "🟡/🟠", "🟠/🔴"]
+      : ["🔴/🟠", "🟠/🟡", "🟡/🟢", "🟢/🔵"];
     corps = `
       <p style="font-size:12px;color:var(--muted);margin-bottom:10px">${sensTxt} — 4 seuils par tranche d'âge et par sexe</p>
       <div style="overflow-x:auto"><table class="admin-table" style="min-width:520px"><thead><tr>
-        <th>Tranche</th><th>Sexe</th><th>🔴/🟠</th><th>🟠/🟡</th><th>🟡/🟢</th><th>🟢/🔵</th></tr></thead><tbody>
+        <th>Tranche</th><th>Sexe</th>${entetes.map(e => `<th>${e}</th>`).join("")}</tr></thead><tbody>
         ${tranches.map((tr,ti)=>["F","H"].map(S=>`
           <tr>
             <td><strong>${esc(tr)}</strong></td><td>${S}</td>
