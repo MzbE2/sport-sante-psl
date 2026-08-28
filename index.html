@@ -844,8 +844,9 @@
 
     <!-- Page détail d'une session (remplace l'ancienne pop-up) -->
     <div id="sessions-vue-detail" style="display:none">
-      <div class="card no-print">
+      <div class="card no-print" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px">
         <button class="btn btn-outline" style="width:auto; padding:8px 14px; font-size:13px" onclick="retourListeSessions()">← Retour aux sessions</button>
+        <button class="btn btn-danger" style="width:auto; padding:8px 14px; font-size:13px" onclick="supprimerSession(sessionDetailId)">🗑️ Supprimer cette session</button>
       </div>
       <div class="card" id="session-detail-print-area">
         <div id="sess-detail-entete"></div>
@@ -2555,9 +2556,12 @@ function renderAdminSessions() {
               <span class="filiere-tag" style="background:var(--bleu-cl);color:var(--bleu)">${(s.encadrants || []).map(esc).join(", ") || "—"}</span>
             </div>
           </div>
-          ${enCours
-            ? `<span class="vbadge" style="background:var(--or-cl);color:var(--orange)">🟢 En cours</span>`
-            : `<span class="vbadge" style="background:var(--vert-cl);color:var(--vert)">✓ Terminée</span>`}
+          <div style="display:flex;align-items:center;gap:8px">
+            ${enCours
+              ? `<span class="vbadge" style="background:var(--or-cl);color:var(--orange)">🟢 En cours</span>`
+              : `<span class="vbadge" style="background:var(--vert-cl);color:var(--vert)">✓ Terminée</span>`}
+            <button class="btn btn-danger btn-sm" title="Supprimer cette session" onclick="event.stopPropagation(); supprimerSession('${id}')">🗑️</button>
+          </div>
         </div>
         <div class="prog">${total} étudiant${total>1?"s":""} · ${tousFaits}/${total} ont fini tous les tests · ${valides}/${total} ont validé</div>
       </div>`;
@@ -2594,6 +2598,24 @@ function retourListeSessions() {
   document.getElementById("sessions-vue-liste").style.display = "block";
 }
 window.retourListeSessions = retourListeSessions;
+
+// Supprime une session. Les résultats des étudiants ne sont jamais effacés :
+// seule la "fiche session" (date, encadrants, statut) disparaît. Les étudiants
+// concernés ne seront simplement plus rattachés à aucune session dans les listes.
+async function supprimerSession(id) {
+  const s = allSessions[id]; if (!s) return;
+  const etus = etudiantsSession(id);
+  const enCours = s.statut === "ouverte";
+  const avert = enCours ? "\n\n⚠️ Cette session est actuellement EN COURS." : "";
+  if (!confirm(`Supprimer la session du ${formatDateFR(s.date)} (${s.debut || ""}${s.fin ? " – " + s.fin : ""}) ?\n\n${etus.length} étudiant(s) y sont rattaché(s) — leurs résultats seront conservés, seule la fiche de session sera supprimée.${avert}\n\nCette action est irréversible.`)) return;
+  try {
+    await remove(ref(db, `sessions/${id}`));
+    if (sessionDetailId === id) retourListeSessions();
+  } catch (e) {
+    alert("Erreur lors de la suppression : " + e.message);
+  }
+}
+window.supprimerSession = supprimerSession;
 
 // Statut synthétique d'un étudiant pour le tri/filtre de la page détail
 function statutSessionEtudiant(r) {
