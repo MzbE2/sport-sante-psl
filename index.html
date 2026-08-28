@@ -1112,7 +1112,7 @@
 <!-- ============================================================ -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getDatabase, ref, set, get, update, remove, onValue, child }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -1522,7 +1522,6 @@ window.motDePasseOublie = async function() {
     return;
   }
   try {
-    const { sendPasswordResetEmail } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
     await sendPasswordResetEmail(auth, email);
     showMsg('reset-msg', '✓ Si un compte existe pour ' + email + ', un email de réinitialisation vient d\'être envoyé. Vérifiez votre boîte (et les spams).', 'success');
   } catch(e) {
@@ -2172,11 +2171,13 @@ async function creerCompteEncadrant({ prenom, nom, email, role, filiere, sexe, a
   const sexeFinal      = role === "etudiant" ? sexe : "";
   const anneeFinale    = role === "etudiant" ? (annee ? +annee : null) : null;
 
-  await set(ref(db, `users/${uid}`), {
+  // Un seul appel multi-chemins au lieu de deux écritures séparées : plus rapide,
+  // surtout utile sur une connexion mobile lente.
+  const updates = {};
+  updates[`users/${uid}`] = {
     prenom, nom, email, filiere: filiereFinale, sexe: sexeFinal, anneeNaissance: anneeFinale, role,
     createdAt: timestamp, creePar: creationDepuis || "encadrant"
-  });
-
+  };
   if (role === "etudiant") {
     const meta = {
       prenom, nom, email, filiere: filiereFinale, sexe: sexeFinal, anneeNaissance: anneeFinale,
@@ -2185,18 +2186,29 @@ async function creerCompteEncadrant({ prenom, nom, email, role, filiere, sexe, a
       createdAt: timestamp, creePar: creationDepuis || "encadrant"
     };
     if (sessionId) { meta.sessionId = sessionId; meta.presentAt = timestamp; }
-    await set(ref(db, `resultats/${uid}/meta`), meta);
+    updates[`resultats/${uid}/meta`] = meta;
   }
+  await update(ref(db), updates);
 
-  // On envoie tout de suite l'email de réinitialisation : l'étudiant·e n'a
-  // qu'à cliquer sur le lien reçu pour choisir son propre mot de passe.
-  try {
-    const { sendPasswordResetEmail } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
-    await sendPasswordResetEmail(secondaryAuth, email);
-  } catch (e) { /* pas grave : l'étudiant·e pourra toujours utiliser "Mot de passe oublié ?" plus tard */ }
+  // Déconnexion de l'app secondaire dès que possible : le compte est déjà créé,
+  // le reste (email de réinitialisation) ne doit plus bloquer la suite.
+  signOut(secondaryAuth).catch(() => {});
 
-  await signOut(secondaryAuth);
+  // Envoi de l'email de réinitialisation en tâche de fond, SANS bloquer la
+  // création : même si l'envoi échoue ou traîne (réseau mobile capricieux),
+  // l'étudiant·e pourra toujours utiliser "Mot de passe oublié ?" plus tard.
+  sendPasswordResetEmail(secondaryAuth, email).catch(() => {});
+
   return uid;
+}
+
+// Empêche un appel de rester bloqué indéfiniment (ex. réseau mobile capricieux) :
+// au-delà du délai, on abandonne l'attente et on affiche une erreur claire.
+function avecTimeout(promesse, ms, messageTimeout) {
+  return Promise.race([
+    promesse,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(messageTimeout)), ms))
+  ]);
 }
 
 // Ouvre le modal de création. contexte = "prof" (rattache toujours à la
@@ -2272,12 +2284,17 @@ window.creerCompteDepuisModal = async function() {
       sessionId = sessionOuverte()[0];
     }
 
-    await creerCompteEncadrant({ prenom, nom, email, role, filiere, sexe, annee, sessionId });
-
+    await avecTimeout(
+      creerCompteEncadrant({ prenom, nom, email, role, filiere, sexe, annee, sessionId }),
+      20000,
+      "La création prend trop de temps (connexion instable ?). Vérifiez votre connexion et réessayez — si le compte a bien été créé malgré tout, il apparaîtra dans la liste."
+    );
     fermerModalCreation();
     alert(`✓ Compte créé pour ${prenom} ${nom} (${email}).\n\nAucun mot de passe à communiquer : un email de réinitialisation vient d'être envoyé, et l'étudiant·e peut aussi utiliser « Mot de passe oublié ? » depuis l'écran de connexion.` + (sessionId ? "\n\nIl/elle apparaît déjà comme présent·e sur la session en cours." : ""));
   } catch (e) {
+    console.error("Erreur création de compte :", e);
     if (e.code === "auth/email-already-in-use") showMsg("creer-compte-msg", "Un compte existe déjà avec cet email.");
+    else if (e.code === "permission-denied" || e.code === "PERMISSION_DENIED") showMsg("creer-compte-msg", "Permission refusée par la base de données. Vérifiez les règles Firebase (droits d'écriture prof/admin).");
     else showMsg("creer-compte-msg", "Erreur : " + e.message);
   } finally {
     btn.disabled = false;
