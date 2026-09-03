@@ -245,10 +245,12 @@
   /* ===== EXPORT PDF (impression) ===== */
   @media print {
     body * { visibility: hidden; }
-    #session-detail-print-area, #session-detail-print-area * { visibility: visible; }
-    #session-detail-print-area { position: absolute; top: 0; left: 0; width: 100%; box-shadow: none; border: none; }
+    #session-detail-print-area, #session-detail-print-area *,
+    .print-target, .print-target * { visibility: visible; }
+    #session-detail-print-area, .print-target { position: absolute; top: 0; left: 0; width: 100%; box-shadow: none; border: none; }
     .no-print { display: none !important; }
     .print-only { display: inline !important; }
+    .print-heading { display: block !important; }
   }
 
   /* ===== TABS ===== */
@@ -795,6 +797,7 @@
   <div class="tabs">
     <button class="tab active" onclick="showTab('tab-admin-dashboard', this)">Dashboard</button>
     <button class="tab" onclick="showTab('tab-admin-resultats', this)">Résultats</button>
+    <button class="tab" onclick="showTab('tab-admin-synthese', this)">📊 Synthèse</button>
     <button class="tab" onclick="showTab('tab-admin-sessions', this)">Sessions</button>
     <button class="tab" onclick="showTab('tab-admin-users', this)">Utilisateurs</button>
     <button class="tab" onclick="showTab('tab-admin-tests', this)">Tests</button>
@@ -820,7 +823,71 @@
           <option value="ENS">ENS</option>
         </select>
       </div>
+      <div id="admin-verdict-compteur" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px"></div>
       <div id="admin-resultats-container"><div class="loading">Chargement…</div></div>
+    </div>
+  </div>
+
+  <!-- Synthèse -->
+  <div id="tab-admin-synthese" class="content" style="display:none">
+    <div class="card no-print" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div>
+        <h3 style="margin:0">📊 Synthèse Sport Santé</h3>
+        <p style="font-size:12px;color:var(--muted);margin-top:4px">Bilan agrégé, mis à jour en direct à partir des résultats saisis.</p>
+      </div>
+      <button class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" onclick="window.print()">🖨️ Exporter la synthèse en PDF</button>
+    </div>
+
+    <div id="synthese-print-area" class="print-target">
+      <p class="print-only print-heading" style="display:none;font-size:13px;color:var(--muted);margin-bottom:10px">
+        Sport Santé — PSL Dauphine · Synthèse générée le <span id="synth-date-export"></span>
+      </p>
+
+      <div class="card">
+        <h3>📊 Vue d'ensemble</h3>
+        <div class="stats-row" id="synth-stats"></div>
+      </div>
+
+      <div class="card">
+        <h3>🚦 Répartition globale du verdict</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Part des étudiants « à accompagner », « peut mieux faire » ou « en bonne forme », sur l'ensemble du bilan.</p>
+        <div style="max-width:360px;margin:0 auto;height:280px"><canvas id="chart-verdict-global"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>🧪 Résultats détaillés, test par test</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
+          Pour chaque test, répartition en % des étudiants dans chaque zone du barème
+          (🔴 à revoir en priorité → 🔵 excellent). Permet de repérer d'un coup d'œil les tests où le plus d'étudiants sont en difficulté.
+        </p>
+        <div id="chart-par-test-wrap" style="height:560px"><canvas id="chart-par-test"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>💪 Résultats par ressource physique sollicitée</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
+          Même lecture que ci-dessus, mais les tests sont regroupés par grande famille (Force, Endurance, Souplesse, Équilibre, Activité, Corpulence)
+          pour identifier la ressource la plus fragile chez nos étudiants.
+        </p>
+        <div id="chart-par-cat-wrap" style="height:320px"><canvas id="chart-par-categorie"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>🏫 Comparaison par filière</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Part (%) d'étudiants dans chaque profil de verdict, filière par filière.</p>
+        <div style="height:300px"><canvas id="chart-par-filiere"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>🧑‍🤝‍🧑 Comparaison Femmes / Hommes</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Part (%) d'étudiantes et d'étudiants dans chaque profil de verdict.</p>
+        <div style="max-width:480px;margin:0 auto;height:280px"><canvas id="chart-par-sexe"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>📝 Bilan de synthèse &amp; objectifs proposés</h3>
+        <div id="synth-texte" style="font-size:14px;line-height:1.75"></div>
+      </div>
     </div>
   </div>
 
@@ -1110,6 +1177,7 @@
 <!-- ============================================================ -->
 <!--  SCRIPTS FIREBASE                                            -->
 <!-- ============================================================ -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail }
@@ -1634,6 +1702,9 @@ function showTab(tabId, btn) {
   btn.classList.add("active");
   parent.querySelectorAll(".content").forEach(c => c.style.display = "none");
   document.getElementById(tabId).style.display = "block";
+  // Les graphiques Chart.js ont besoin que leur <canvas> soit visible pour
+  // se dimensionner correctement : on (re)dessine à l'ouverture de l'onglet.
+  if (tabId === "tab-admin-synthese" && typeof renderAdminSynthese === "function") renderAdminSynthese();
 }
 
 // ── Helpers messages ─────────────────────────────────────────
@@ -2516,6 +2587,11 @@ async function initAdmin() {
     renderAdminResultats();
     renderAdminSessions();
     if (sessionDetailId) renderSessionDetailTable();
+    // Ne redessiner les graphiques que si l'onglet Synthèse est déjà visible
+    // (sinon les canvas sont masqués et se dimensionnent mal) — showTab s'en
+    // charge sinon au moment de l'ouverture de l'onglet.
+    const ongletSynthese = document.getElementById("tab-admin-synthese");
+    if (ongletSynthese && ongletSynthese.style.display !== "none") renderAdminSynthese();
   });
   onValue(ref(db, "users"), snap => {
     allUsers = snap.exists() ? snap.val() : {};
@@ -2960,19 +3036,38 @@ function renderAdminResultats() {
     return true;
   });
 
-  if (!rows.length) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun étudiant ne correspond.</p>"; return; }
+  const compteurEl = document.getElementById("admin-verdict-compteur");
+  if (!rows.length) {
+    if (compteurEl) compteurEl.innerHTML = "";
+    container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun étudiant ne correspond.</p>"; return;
+  }
 
   // Tri groupé par couleur de bilan : rouge → orange → jaune → vert → bleu,
   // puis le plus de rouges en tête, puis ordre alphabétique.
   const RANG = { rouge:0, orange:1, jaune:2, vert:3, bleu:4 };
-  rows.sort(([, a], [, b]) => {
-    const va = calcVerdict(a), vb = calcVerdict(b);
+  const verdicts = new Map();
+  rows.forEach(([uid, r]) => verdicts.set(uid, calcVerdict(r)));
+  rows.sort(([uidA, a], [uidB, b]) => {
+    const va = verdicts.get(uidA), vb = verdicts.get(uidB);
     const ra = va.niveau === "vide" ? 9 : (RANG[va.couleur] ?? 8);
     const rb = vb.niveau === "vide" ? 9 : (RANG[vb.couleur] ?? 8);
     if (ra !== rb) return ra - rb;
     if (vb.nRouge !== va.nRouge) return vb.nRouge - va.nRouge;
     return `${a.meta?.nom||""}`.localeCompare(`${b.meta?.nom||""}`);
   });
+
+  // Compteur rapide : combien d'étudiants (parmi ceux affichés) sont en verdict rouge.
+  if (compteurEl) {
+    const nAccompagner = rows.filter(([uid]) => verdicts.get(uid).niveau === "accompagner").length;
+    const nMoyen       = rows.filter(([uid]) => verdicts.get(uid).niveau === "moyen").length;
+    const nForme       = rows.filter(([uid]) => verdicts.get(uid).niveau === "forme").length;
+    const chip = (bg, color, txt) => `<span style="background:${bg};color:${color};font-weight:700;padding:5px 12px;border-radius:20px;font-size:12.5px;white-space:nowrap">${txt}</span>`;
+    compteurEl.innerHTML =
+      chip(COULEUR_CLAIR.rouge, COULEURS.rouge.hex, `🔴 ${nAccompagner} en rouge (à accompagner)`) +
+      chip(COULEUR_CLAIR.jaune, "#8a6d00", `🟡 ${nMoyen} peut mieux faire`) +
+      chip(COULEUR_CLAIR.vert, COULEURS.vert.hex, `🟢 ${nForme} en bonne forme`) +
+      chip("var(--gris)", "var(--muted)", `${rows.length} affiché(s) au total`);
+  }
 
   container.innerHTML = `
     <table class="admin-table">
@@ -3023,6 +3118,313 @@ function renderAdminResultats() {
     </table>
   `;
 }
+
+// ── Onglet Synthèse : agrégation des résultats + graphiques Chart.js ──
+// Rangs par défaut du barème, du plus critique au meilleur.
+const ORDRE_COULEURS_BAREME = ["rouge", "orange", "jaune", "vert", "bleu"];
+
+function calculerStatsSynthese() {
+  const etudiants = Object.values(allResultats).filter(r => r.meta?.filiere && r.meta.filiere !== "");
+  const total = etudiants.length;
+
+  // Verdict global (même logique que calcVerdict / tri de l'onglet Résultats)
+  const verdictCounts = { accompagner: 0, moyen: 0, forme: 0, vide: 0 };
+  etudiants.forEach(r => { verdictCounts[calcVerdict(r).niveau]++; });
+
+  // Détail test par test
+  const parTest = TESTS.map(t => {
+    const counts = { rouge: 0, orange: 0, jaune: 0, vert: 0, bleu: 0 };
+    let n = 0;
+    etudiants.forEach(r => {
+      const age = ageDepuis(r.meta?.anneeNaissance);
+      const c = couleurResultat(t, r.tests?.[t.id], r.meta?.sexe, age);
+      if (c) { counts[c]++; n++; }
+    });
+    return { test: t, counts, n };
+  });
+
+  // Détail par ressource / famille de tests (categorie)
+  const categories = [...new Set(TESTS.map(t => t.categorie || "Autre"))];
+  const parCategorie = categories.map(cat => {
+    const counts = { rouge: 0, orange: 0, jaune: 0, vert: 0, bleu: 0 };
+    let n = 0;
+    TESTS.filter(t => (t.categorie || "Autre") === cat).forEach(t => {
+      etudiants.forEach(r => {
+        const age = ageDepuis(r.meta?.anneeNaissance);
+        const c = couleurResultat(t, r.tests?.[t.id], r.meta?.sexe, age);
+        if (c) { counts[c]++; n++; }
+      });
+    });
+    return { categorie: cat, counts, n };
+  }).filter(c => c.n > 0);
+
+  // Comparaison par filière
+  const filieres = [...new Set(etudiants.map(r => r.meta.filiere).filter(Boolean))].sort();
+  const parFiliere = filieres.map(f => {
+    const groupe = etudiants.filter(r => r.meta.filiere === f);
+    const vc = { accompagner: 0, moyen: 0, forme: 0, vide: 0 };
+    groupe.forEach(r => { vc[calcVerdict(r).niveau]++; });
+    return { label: f, total: groupe.length, verdictCounts: vc };
+  }).filter(g => g.total > 0);
+
+  // Comparaison Femmes / Hommes
+  const parSexe = [
+    { cle: "F", label: "Femmes" },
+    { cle: "H", label: "Hommes" },
+  ].map(s => {
+    const groupe = etudiants.filter(r => r.meta.sexe === s.cle);
+    const vc = { accompagner: 0, moyen: 0, forme: 0, vide: 0 };
+    groupe.forEach(r => { vc[calcVerdict(r).niveau]++; });
+    return { label: s.label, total: groupe.length, verdictCounts: vc };
+  }).filter(g => g.total > 0);
+
+  return { total, verdictCounts, parTest, parCategorie, parFiliere, parSexe, avecDonnees: total - verdictCounts.vide };
+}
+
+function pctVerdictGroupe(vc) {
+  const n = vc.accompagner + vc.moyen + vc.forme;
+  return {
+    n,
+    accompagner: n ? Math.round(vc.accompagner * 100 / n) : 0,
+    moyen: n ? Math.round(vc.moyen * 100 / n) : 0,
+    forme: n ? Math.round(vc.forme * 100 / n) : 0,
+  };
+}
+
+function genererTexteSynthese(stats) {
+  const { total, verdictCounts, parCategorie, parFiliere, parSexe, avecDonnees } = stats;
+  if (!avecDonnees) {
+    return "<p style='color:var(--muted)'>Pas encore assez de bilans saisis pour établir une synthèse. Revenez ici une fois que davantage d'étudiants auront passé les tests.</p>";
+  }
+  const pct = n => Math.round(n * 100 / avecDonnees);
+  const pctAccompagner = pct(verdictCounts.accompagner);
+  const pctForme = pct(verdictCounts.forme);
+
+  const classees = parCategorie
+    .map(c => ({ nom: c.categorie, pctBesoin: Math.round((c.counts.rouge + c.counts.orange) * 100 / c.n) }))
+    .sort((a, b) => b.pctBesoin - a.pctBesoin);
+  const pire = classees[0];
+  const meilleure = classees[classees.length - 1];
+
+  // Écarts filière / sexe, seulement si assez de groupes avec des données
+  let paraFiliere = "";
+  const filieresAvecPct = (parFiliere || []).filter(f => pctVerdictGroupe(f.verdictCounts).n > 0)
+    .map(f => ({ label: f.label, ...pctVerdictGroupe(f.verdictCounts) }))
+    .sort((a, b) => b.accompagner - a.accompagner);
+  if (filieresAvecPct.length >= 2) {
+    const plusTouchee = filieresAvecPct[0];
+    const moinsTouchee = filieresAvecPct[filieresAvecPct.length - 1];
+    if (plusTouchee.accompagner > moinsTouchee.accompagner) {
+      paraFiliere = `<p style="margin-top:12px">Entre filières, l'écart est notable : <strong>${esc(plusTouchee.label)}</strong>
+      compte ${plusTouchee.accompagner}\u202f% d'étudiants « à accompagner » contre ${moinsTouchee.accompagner}\u202f% en <strong>${esc(moinsTouchee.label)}</strong>,
+      ce qui peut justifier un accompagnement renforcé et ciblé pour la première.</p>`;
+    } else {
+      paraFiliere = `<p style="margin-top:12px">Les filières présentent un profil de santé physique globalement homogène, sans écart marqué entre elles.</p>`;
+    }
+  }
+
+  let paraSexe = "";
+  const sexeAvecPct = (parSexe || []).filter(s => pctVerdictGroupe(s.verdictCounts).n > 0)
+    .map(s => ({ label: s.label, ...pctVerdictGroupe(s.verdictCounts) }));
+  if (sexeAvecPct.length === 2) {
+    const [a, b] = sexeAvecPct;
+    const ecart = Math.abs(a.accompagner - b.accompagner);
+    if (ecart >= 5) {
+      const plus = a.accompagner > b.accompagner ? a : b;
+      const moins = a.accompagner > b.accompagner ? b : a;
+      paraSexe = ` Côté sexe, les <strong>${esc(plus.label.toLowerCase())}</strong> sont proportionnellement plus concerné(e)s
+      par un profil « à accompagner » (${plus.accompagner}\u202f% contre ${moins.accompagner}\u202f%) — un point à surveiller dans le choix des ateliers proposés.`;
+    } else {
+      paraSexe = ` Aucun écart notable n'est observé entre femmes et hommes sur ce critère.`;
+    }
+  }
+
+  return `
+    <p><strong>Bilan général —</strong> sur <strong>${total}</strong> étudiant${total>1?"s":""} de L1 évalué${total>1?"s":""},
+    <strong style="color:${COULEURS.rouge.hex}">${verdictCounts.accompagner} (${pctAccompagner}\u202f%)</strong> présentent un profil
+    <strong>« à accompagner »</strong>, <strong>${verdictCounts.moyen}</strong> un profil « peut mieux faire », et
+    <strong style="color:${COULEURS.vert.hex}">${verdictCounts.forme} (${pctForme}\u202f%)</strong> sont déjà en bonne forme physique.
+    ${pire ? `La ressource la plus fragile du groupe est <strong>${esc(pire.nom)}</strong> (${pire.pctBesoin}\u202f% des résultats en zone rouge/orange),
+    tandis que <strong>${esc(meilleure.nom)}</strong> ressort comme le point fort (${meilleure.pctBesoin}\u202f% seulement en zone d'alerte).` : ""}${paraSexe}</p>
+    ${paraFiliere}
+
+    <p style="margin-top:12px"><strong>🎯 Objectif à court terme (année de L1) :</strong> orienter en priorité les
+    ${verdictCounts.accompagner} étudiant${verdictCounts.accompagner>1?"s":""} identifié${verdictCounts.accompagner>1?"s":""} « à accompagner » vers le SUAPS
+    (créneaux et ateliers adaptés), avec un focus particulier sur la ressource <strong>${pire ? esc(pire.nom) : "la plus fragile"}</strong>.
+    Objectif chiffré réaliste : réduire d'au moins un tiers le nombre d'étudiants en zone rouge d'ici la fin de l'année, vérifié par un
+    nouveau bilan de contrôle en fin de L1.</p>
+
+    <p style="margin-top:12px"><strong>🎯 Objectif sur les 5 années de scolarité :</strong> installer une pratique physique régulière et autonome
+    (endurance, force, souplesse, équilibre) chez l'ensemble de la promotion, afin que la grande majorité des étudiants basculent d'un profil
+    « à accompagner »/« peut mieux faire » vers « en bonne forme » d'ici la fin du cursus. Reconduire ce bilan chaque année permet de suivre
+    cette trajectoire individuellement et collectivement, filière par filière.</p>
+
+    <p style="margin-top:12px"><strong>🎯 Objectif pour leur vie future d'adulte :</strong> ancrer des habitudes durables d'activité physique
+    et de gestion de la sédentarité pendant les années les plus propices à leur installation, afin de limiter à long terme les risques de
+    troubles musculo-squelettiques, cardio-vasculaires et de sédentarité chronique. Le bilan Sport Santé devient ainsi un outil de prévention
+    sur toute une vie, et pas seulement une évaluation ponctuelle de L1.</p>
+  `;
+}
+
+let chartVerdictGlobal = null, chartParTest = null, chartParCategorie = null, chartParFiliere = null, chartParSexe = null;
+
+function renderAdminSynthese() {
+  if (typeof Chart === "undefined") return; // Chart.js pas encore chargé
+  const conteneur = document.getElementById("tab-admin-synthese");
+  if (!conteneur) return;
+
+  const stats = calculerStatsSynthese();
+  const { total, verdictCounts, parTest, parCategorie, parFiliere, parSexe, avecDonnees } = stats;
+  const pct = n => avecDonnees ? Math.round(n * 100 / avecDonnees) : 0;
+
+  const dateEl = document.getElementById("synth-date-export");
+  if (dateEl) dateEl.textContent = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+
+  // Cartes-résumé
+  document.getElementById("synth-stats").innerHTML = `
+    <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-label">Étudiants L1</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--rouge)"><div class="stat-val" style="color:var(--rouge)">${verdictCounts.accompagner}</div><div class="stat-label">🚩 À accompagner (${pct(verdictCounts.accompagner)}%)</div></div>
+    <div class="stat-card" style="border-top:3px solid #f1c40f"><div class="stat-val" style="color:#8a6d00">${verdictCounts.moyen}</div><div class="stat-label">Peut mieux faire (${pct(verdictCounts.moyen)}%)</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--vert)"><div class="stat-val" style="color:var(--vert)">${verdictCounts.forme}</div><div class="stat-label">✅ En bonne forme (${pct(verdictCounts.forme)}%)</div></div>
+    <div class="stat-card" style="border-top:3px solid var(--gris2)"><div class="stat-val" style="color:var(--muted)">${verdictCounts.vide}</div><div class="stat-label">○ Bilan non exploitable</div></div>
+  `;
+
+  // Donut : répartition globale du verdict
+  const ctxVerdict = document.getElementById("chart-verdict-global");
+  if (chartVerdictGlobal) chartVerdictGlobal.destroy();
+  if (ctxVerdict) {
+    chartVerdictGlobal = new Chart(ctxVerdict, {
+      type: "doughnut",
+      data: {
+        labels: ["🚩 À accompagner", "Peut mieux faire", "✅ En bonne forme"],
+        datasets: [{
+          data: [verdictCounts.accompagner, verdictCounts.moyen, verdictCounts.forme],
+          backgroundColor: [COULEURS.rouge.hex, COULEURS.jaune.hex, COULEURS.vert.hex],
+          borderWidth: 2, borderColor: "#fff"
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 14, font: { size: 12 } } } }
+      }
+    });
+  }
+
+  // Barres empilées horizontales (%) : un groupe par test
+  const ctxTest = document.getElementById("chart-par-test");
+  if (chartParTest) chartParTest.destroy();
+  if (ctxTest) {
+    document.getElementById("chart-par-test-wrap").style.height = Math.max(360, parTest.length * 34) + "px";
+    chartParTest = new Chart(ctxTest, {
+      type: "bar",
+      data: {
+        labels: parTest.map(pt => `${pt.test.abbr || pt.test.id} — ${pt.test.nom}`),
+        datasets: ORDRE_COULEURS_BAREME.map(coul => ({
+          label: COULEURS[coul].label,
+          backgroundColor: COULEURS[coul].hex,
+          data: parTest.map(pt => pt.n ? Math.round(pt.counts[coul] * 1000 / pt.n) / 10 : 0),
+          stack: "s"
+        }))
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { stacked: true, min: 0, max: 100, ticks: { callback: v => v + "%" }, title: { display: true, text: "% des étudiants testés" } },
+          y: { stacked: true, ticks: { font: { size: 11 } } }
+        },
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 14, font: { size: 12 } } },
+          tooltip: { callbacks: { label: c => `${c.dataset.label} : ${c.parsed.x}%` } }
+        }
+      }
+    });
+  }
+
+  // Barres empilées horizontales (%) : une par ressource / famille de tests
+  const ctxCat = document.getElementById("chart-par-categorie");
+  if (chartParCategorie) chartParCategorie.destroy();
+  if (ctxCat) {
+    document.getElementById("chart-par-cat-wrap").style.height = Math.max(220, parCategorie.length * 46) + "px";
+    chartParCategorie = new Chart(ctxCat, {
+      type: "bar",
+      data: {
+        labels: parCategorie.map(pc => pc.categorie),
+        datasets: ORDRE_COULEURS_BAREME.map(coul => ({
+          label: COULEURS[coul].label,
+          backgroundColor: COULEURS[coul].hex,
+          data: parCategorie.map(pc => pc.n ? Math.round(pc.counts[coul] * 1000 / pc.n) / 10 : 0),
+          stack: "s"
+        }))
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { stacked: true, min: 0, max: 100, ticks: { callback: v => v + "%" }, title: { display: true, text: "% des résultats testés" } },
+          y: { stacked: true, ticks: { font: { size: 12 } } }
+        },
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 14, font: { size: 12 } } },
+          tooltip: { callbacks: { label: c => `${c.dataset.label} : ${c.parsed.x}%` } }
+        }
+      }
+    });
+  }
+
+  // Barres groupées verticales (%) : comparaison par filière
+  const ctxFiliere = document.getElementById("chart-par-filiere");
+  if (chartParFiliere) chartParFiliere.destroy();
+  if (ctxFiliere) {
+    chartParFiliere = new Chart(ctxFiliere, {
+      type: "bar",
+      data: {
+        labels: parFiliere.map(f => `${f.label} (n=${f.total})`),
+        datasets: [
+          { label: "🚩 À accompagner", backgroundColor: COULEURS.rouge.hex, data: parFiliere.map(f => pctVerdictGroupe(f.verdictCounts).accompagner) },
+          { label: "Peut mieux faire", backgroundColor: COULEURS.jaune.hex, data: parFiliere.map(f => pctVerdictGroupe(f.verdictCounts).moyen) },
+          { label: "✅ En bonne forme", backgroundColor: COULEURS.vert.hex, data: parFiliere.map(f => pctVerdictGroupe(f.verdictCounts).forme) },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + "%" }, title: { display: true, text: "% du groupe" } } },
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 14, font: { size: 12 } } },
+          tooltip: { callbacks: { label: c => `${c.dataset.label} : ${c.parsed.y}%` } }
+        }
+      }
+    });
+  }
+
+  // Barres groupées verticales (%) : comparaison Femmes / Hommes
+  const ctxSexe = document.getElementById("chart-par-sexe");
+  if (chartParSexe) chartParSexe.destroy();
+  if (ctxSexe) {
+    chartParSexe = new Chart(ctxSexe, {
+      type: "bar",
+      data: {
+        labels: parSexe.map(s => `${s.label} (n=${s.total})`),
+        datasets: [
+          { label: "🚩 À accompagner", backgroundColor: COULEURS.rouge.hex, data: parSexe.map(s => pctVerdictGroupe(s.verdictCounts).accompagner) },
+          { label: "Peut mieux faire", backgroundColor: COULEURS.jaune.hex, data: parSexe.map(s => pctVerdictGroupe(s.verdictCounts).moyen) },
+          { label: "✅ En bonne forme", backgroundColor: COULEURS.vert.hex, data: parSexe.map(s => pctVerdictGroupe(s.verdictCounts).forme) },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + "%" }, title: { display: true, text: "% du groupe" } } },
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 14, font: { size: 12 } } },
+          tooltip: { callbacks: { label: c => `${c.dataset.label} : ${c.parsed.y}%` } }
+        }
+      }
+    });
+  }
+
+  document.getElementById("synth-texte").innerHTML = genererTexteSynthese(stats);
+}
+window.renderAdminSynthese = renderAdminSynthese;
 
 function renderAdminUsers() {
   const container = document.getElementById("admin-users-container");
