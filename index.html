@@ -754,6 +754,8 @@
             <option value="MSO">MSO</option>
             <option value="ESCPI">ESCPI</option>
             <option value="ENS">ENS</option>
+            <option value="MIDO">MIDO</option>
+            <option value="Double Licence">Double Licence</option>
           </select>
         </div>
         <div class="form-group">
@@ -866,6 +868,8 @@
           <option value="MSO">MSO</option>
           <option value="ESCPI">ESCPI</option>
           <option value="ENS">ENS</option>
+          <option value="MIDO">MIDO</option>
+          <option value="Double Licence">Double Licence</option>
         </select>
       </div>
       <div id="admin-verdict-compteur" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px"></div>
@@ -970,6 +974,8 @@
             <option value="MSO">MSO</option>
             <option value="ESCPI">ESCPI</option>
             <option value="ENS">ENS</option>
+            <option value="MIDO">MIDO</option>
+            <option value="Double Licence">Double Licence</option>
           </select>
           <select id="sess-detail-statut" onchange="renderSessionDetailTable()" style="width:auto; margin-bottom:0">
             <option value="">Tous les statuts</option>
@@ -1111,6 +1117,8 @@
           <option value="MSO">MSO</option>
           <option value="ESCPI">ESCPI</option>
           <option value="ENS">ENS</option>
+          <option value="MIDO">MIDO</option>
+          <option value="Double Licence">Double Licence</option>
         </select>
       </div>
       <div class="form-group">
@@ -2962,7 +2970,7 @@ window.genererDonneesDemo = async function() {
     }
 
     // 3. Étudiants fictifs + résultats réalistes
-    const filieres = ["LSO", "MSO", "ESCPI", "ENS"];
+    const filieres = ["LSO", "MSO", "ESCPI", "ENS", "MIDO", "Double Licence"];
     for (let i = 0; i < nbEtudiants; i++) {
       majProg("Création des étudiants…");
       const sexe = Math.random() < 0.5 ? "F" : "H";
@@ -3548,6 +3556,8 @@ function renderAdminUsers() {
                 <option value="MSO"    ${u.filiere==="MSO"   ?"selected":""}>MSO</option>
                 <option value="ESCPI"  ${u.filiere==="ESCPI" ?"selected":""}>ESCPI</option>
                 <option value="ENS"    ${u.filiere==="ENS"   ?"selected":""}>ENS</option>
+                <option value="MIDO"   ${u.filiere==="MIDO"  ?"selected":""}>MIDO</option>
+                <option value="Double Licence" ${u.filiere==="Double Licence"?"selected":""}>Double Licence</option>
               </select>
             </td>
             <td>
