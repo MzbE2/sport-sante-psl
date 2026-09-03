@@ -467,6 +467,51 @@
   /* ===== STATS CARDS ===== */
   .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .stat-card { background: white; border-radius: var(--radius); padding: 14px; text-align: center; box-shadow: var(--shadow); }
+
+  /* ===== SYNTHÈSE — mots-clés, chips et blocs d'objectifs ===== */
+  .synth-highlights { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 20px;
+    font-size: 12.5px; font-weight: 700; line-height: 1.3;
+  }
+  .chip-rouge  { background: var(--rouge-cl); color: var(--rouge); }
+  .chip-vert   { background: var(--vert-cl);  color: var(--vert); }
+  .chip-jaune  { background: #fdf6d0;         color: #8a6d00; }
+  .chip-neutre { background: var(--bleu-cl);  color: var(--bleu); }
+
+  .synth-intro {
+    font-size: 14.5px; line-height: 1.85; color: var(--texte);
+    padding-bottom: 20px; margin-bottom: 22px;
+    border-bottom: 1px dashed var(--gris2);
+  }
+  .kw { padding: 1px 7px; border-radius: 6px; font-weight: 700; white-space: nowrap; }
+  .kw-rouge  { background: var(--rouge-cl); color: var(--rouge); }
+  .kw-vert   { background: var(--vert-cl);  color: var(--vert); }
+  .kw-jaune  { background: #fdf6d0;         color: #8a6d00; }
+  .kw-neutre { background: var(--bleu-cl);  color: var(--bleu); }
+
+  .synth-objectifs { display: flex; flex-direction: column; gap: 16px; }
+  .synth-obj {
+    display: flex; gap: 16px; align-items: flex-start;
+    padding: 16px 18px; border-radius: 12px;
+    background: var(--gris); border-left: 5px solid var(--bleu);
+  }
+  .synth-obj-icon {
+    font-size: 22px; flex-shrink: 0; width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    background: white; border-radius: 50%; box-shadow: var(--shadow);
+  }
+  .synth-obj-body { flex: 1; min-width: 0; }
+  .synth-obj-body h4 {
+    font-size: 14.5px; font-weight: 800; color: var(--texte);
+    margin-bottom: 6px;
+  }
+  .synth-obj-body h4 span { font-weight: 500; color: var(--muted); font-size: 13px; }
+  .synth-obj-body p { font-size: 13.5px; line-height: 1.75; color: var(--texte); margin: 0; }
+  .synth-obj.obj-court { border-left-color: var(--rouge); }
+  .synth-obj.obj-moyen { border-left-color: var(--bleu); }
+  .synth-obj.obj-long  { border-left-color: var(--vert); }
   .stat-val { font-size: 28px; font-weight: 800; color: var(--bleu); }
   .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
@@ -3191,6 +3236,16 @@ function pctVerdictGroupe(vc) {
   };
 }
 
+// Libellé complet d'une ressource — précise le test associé quand la catégorie
+// ne contient qu'un seul test peu explicite par son seul nom (ex. Activité → Ricci & Gagnon).
+function libelleRessource(nom) {
+  if (nom === "Activité") return "Activité physique habituelle (test de Ricci &amp; Gagnon)";
+  return esc(nom || "");
+}
+
+// Petit "mot-clé" mis en évidence (fond coloré) dans le texte de synthèse.
+function kw(txt, cls) { return `<span class="kw kw-${cls}">${txt}</span>`; }
+
 function genererTexteSynthese(stats) {
   const { total, verdictCounts, parCategorie, parFiliere, parSexe, avecDonnees } = stats;
   if (!avecDonnees) {
@@ -3207,7 +3262,8 @@ function genererTexteSynthese(stats) {
   const meilleure = classees[classees.length - 1];
 
   // Écarts filière / sexe, seulement si assez de groupes avec des données
-  let paraFiliere = "";
+  const chipsEcarts = [];
+  let phraseFiliere = "";
   const filieresAvecPct = (parFiliere || []).filter(f => pctVerdictGroupe(f.verdictCounts).n > 0)
     .map(f => ({ label: f.label, ...pctVerdictGroupe(f.verdictCounts) }))
     .sort((a, b) => b.accompagner - a.accompagner);
@@ -3215,15 +3271,16 @@ function genererTexteSynthese(stats) {
     const plusTouchee = filieresAvecPct[0];
     const moinsTouchee = filieresAvecPct[filieresAvecPct.length - 1];
     if (plusTouchee.accompagner > moinsTouchee.accompagner) {
-      paraFiliere = `<p style="margin-top:12px">Entre filières, l'écart est notable : <strong>${esc(plusTouchee.label)}</strong>
-      compte ${plusTouchee.accompagner}\u202f% d'étudiants « à accompagner » contre ${moinsTouchee.accompagner}\u202f% en <strong>${esc(moinsTouchee.label)}</strong>,
-      ce qui peut justifier un accompagnement renforcé et ciblé pour la première.</p>`;
+      phraseFiliere = `Entre filières, l'écart est notable&nbsp;: ${kw(esc(plusTouchee.label), 'neutre')} compte
+      ${kw(plusTouchee.accompagner + '\u202f%', 'rouge')} d'étudiants « à accompagner » contre ${kw(moinsTouchee.accompagner + '\u202f%', 'vert')}
+      en ${kw(esc(moinsTouchee.label), 'neutre')}, ce qui peut justifier un accompagnement renforcé et ciblé pour la première.`;
+      chipsEcarts.push(`<span class="chip chip-jaune">🏫 Écart filières&nbsp;: ${esc(plusTouchee.label)} ${plusTouchee.accompagner}% vs ${esc(moinsTouchee.label)} ${moinsTouchee.accompagner}%</span>`);
     } else {
-      paraFiliere = `<p style="margin-top:12px">Les filières présentent un profil de santé physique globalement homogène, sans écart marqué entre elles.</p>`;
+      phraseFiliere = "Les filières présentent un profil de santé physique globalement homogène, sans écart marqué entre elles.";
     }
   }
 
-  let paraSexe = "";
+  let phraseSexe = "";
   const sexeAvecPct = (parSexe || []).filter(s => pctVerdictGroupe(s.verdictCounts).n > 0)
     .map(s => ({ label: s.label, ...pctVerdictGroupe(s.verdictCounts) }));
   if (sexeAvecPct.length === 2) {
@@ -3232,37 +3289,73 @@ function genererTexteSynthese(stats) {
     if (ecart >= 5) {
       const plus = a.accompagner > b.accompagner ? a : b;
       const moins = a.accompagner > b.accompagner ? b : a;
-      paraSexe = ` Côté sexe, les <strong>${esc(plus.label.toLowerCase())}</strong> sont proportionnellement plus concerné(e)s
-      par un profil « à accompagner » (${plus.accompagner}\u202f% contre ${moins.accompagner}\u202f%) — un point à surveiller dans le choix des ateliers proposés.`;
+      phraseSexe = `Côté sexe, les ${kw(esc(plus.label.toLowerCase()), 'rouge')} sont proportionnellement plus concerné(e)s par un profil
+      « à accompagner » (${plus.accompagner}\u202f% contre ${moins.accompagner}\u202f%) — un point à surveiller dans le choix des ateliers proposés.`;
+      chipsEcarts.push(`<span class="chip chip-jaune">⚧ Écart F/H&nbsp;: ${plus.label} ${plus.accompagner}% vs ${moins.label} ${moins.accompagner}%</span>`);
     } else {
-      paraSexe = ` Aucun écart notable n'est observé entre femmes et hommes sur ce critère.`;
+      phraseSexe = "Aucun écart notable n'est observé entre femmes et hommes sur ce critère.";
     }
   }
 
+  // Mots-clés / chiffres à retenir en un coup d'œil, en tête de synthèse.
+  const chips = [
+    `<span class="chip chip-rouge">🚩 ${verdictCounts.accompagner} étudiant${verdictCounts.accompagner>1?"s":""} (${pctAccompagner}%) à accompagner</span>`,
+    `<span class="chip chip-vert">✅ ${verdictCounts.forme} (${pctForme}%) en bonne forme</span>`,
+  ];
+  if (pire) chips.push(`<span class="chip chip-neutre">⚠️ Point faible&nbsp;: ${libelleRessource(pire.nom)} — ${pire.pctBesoin}% en zone d'alerte</span>`);
+  if (meilleure) chips.push(`<span class="chip chip-neutre">🏆 Point fort&nbsp;: ${libelleRessource(meilleure.nom)} — ${meilleure.pctBesoin}% seulement</span>`);
+  chips.push(...chipsEcarts);
+
   return `
-    <p><strong>Bilan général —</strong> sur <strong>${total}</strong> étudiant${total>1?"s":""} de L1 évalué${total>1?"s":""},
-    <strong style="color:${COULEURS.rouge.hex}">${verdictCounts.accompagner} (${pctAccompagner}\u202f%)</strong> présentent un profil
-    <strong>« à accompagner »</strong>, <strong>${verdictCounts.moyen}</strong> un profil « peut mieux faire », et
-    <strong style="color:${COULEURS.vert.hex}">${verdictCounts.forme} (${pctForme}\u202f%)</strong> sont déjà en bonne forme physique.
-    ${pire ? `La ressource la plus fragile du groupe est <strong>${esc(pire.nom)}</strong> (${pire.pctBesoin}\u202f% des résultats en zone rouge/orange),
-    tandis que <strong>${esc(meilleure.nom)}</strong> ressort comme le point fort (${meilleure.pctBesoin}\u202f% seulement en zone d'alerte).` : ""}${paraSexe}</p>
-    ${paraFiliere}
+    <div class="synth-highlights">${chips.join("")}</div>
 
-    <p style="margin-top:12px"><strong>🎯 Objectif à court terme (année de L1) :</strong> orienter en priorité les
-    ${verdictCounts.accompagner} étudiant${verdictCounts.accompagner>1?"s":""} identifié${verdictCounts.accompagner>1?"s":""} « à accompagner » vers le SUAPS
-    (créneaux et ateliers adaptés), avec un focus particulier sur la ressource <strong>${pire ? esc(pire.nom) : "la plus fragile"}</strong>.
-    Objectif chiffré réaliste : réduire d'au moins un tiers le nombre d'étudiants en zone rouge d'ici la fin de l'année, vérifié par un
-    nouveau bilan de contrôle en fin de L1.</p>
+    <p class="synth-intro">
+      Sur ${kw(total, 'neutre')} étudiant${total>1?"s":""} de L1 évalué${total>1?"s":""},
+      ${kw(`${verdictCounts.accompagner} (${pctAccompagner}\u202f%)`, 'rouge')} présentent un profil <strong>« à accompagner »</strong>,
+      ${kw(verdictCounts.moyen, 'jaune')} un profil « peut mieux faire », et ${kw(`${verdictCounts.forme} (${pctForme}\u202f%)`, 'vert')}
+      sont déjà en bonne forme physique.
+      <br><br>
+      ${pire ? `La ressource la plus fragile du groupe est ${kw(libelleRessource(pire.nom), 'neutre')}
+      (${kw(pire.pctBesoin + '\u202f%', 'rouge')} des résultats en zone rouge/orange), tandis que ${kw(libelleRessource(meilleure.nom), 'neutre')}
+      ressort comme le point fort (${kw(meilleure.pctBesoin + '\u202f%', 'vert')} seulement en zone d'alerte).` : ""}
+      ${phraseFiliere ? `<br><br>${phraseFiliere}` : ""}
+      ${phraseSexe ? `<br><br>${phraseSexe}` : ""}
+    </p>
 
-    <p style="margin-top:12px"><strong>🎯 Objectif sur les 5 années de scolarité :</strong> installer une pratique physique régulière et autonome
-    (endurance, force, souplesse, équilibre) chez l'ensemble de la promotion, afin que la grande majorité des étudiants basculent d'un profil
-    « à accompagner »/« peut mieux faire » vers « en bonne forme » d'ici la fin du cursus. Reconduire ce bilan chaque année permet de suivre
-    cette trajectoire individuellement et collectivement, filière par filière.</p>
+    <div class="synth-objectifs">
+      <div class="synth-obj obj-court">
+        <div class="synth-obj-icon">🎯</div>
+        <div class="synth-obj-body">
+          <h4>Court terme <span>— année de L1</span></h4>
+          <p>Orienter en priorité les ${kw(verdictCounts.accompagner, 'rouge')} étudiant${verdictCounts.accompagner>1?"s":""} identifié${verdictCounts.accompagner>1?"s":""}
+          « à accompagner » vers le <strong>SUAPS</strong> (créneaux et ateliers adaptés), avec un focus particulier sur
+          ${kw(libelleRessource(pire ? pire.nom : "la ressource la plus fragile"), 'neutre')}.
+          Objectif chiffré réaliste&nbsp;: réduire d'au moins ${kw('un tiers', 'rouge')} le nombre d'étudiants en zone rouge d'ici la fin de l'année,
+          vérifié par un nouveau bilan de contrôle en fin de L1.</p>
+        </div>
+      </div>
 
-    <p style="margin-top:12px"><strong>🎯 Objectif pour leur vie future d'adulte :</strong> ancrer des habitudes durables d'activité physique
-    et de gestion de la sédentarité pendant les années les plus propices à leur installation, afin de limiter à long terme les risques de
-    troubles musculo-squelettiques, cardio-vasculaires et de sédentarité chronique. Le bilan Sport Santé devient ainsi un outil de prévention
-    sur toute une vie, et pas seulement une évaluation ponctuelle de L1.</p>
+      <div class="synth-obj obj-moyen">
+        <div class="synth-obj-icon">📈</div>
+        <div class="synth-obj-body">
+          <h4>Moyen terme <span>— 5 années de scolarité</span></h4>
+          <p>Installer une <strong>pratique physique régulière et autonome</strong> (endurance, force, souplesse, équilibre) chez l'ensemble
+          de la promotion, afin que la grande majorité des étudiants basculent d'un profil « à accompagner »/« peut mieux faire » vers
+          ${kw('« en bonne forme »', 'vert')} d'ici la fin du cursus. Reconduire ce bilan chaque année permet de suivre cette trajectoire,
+          filière par filière.</p>
+        </div>
+      </div>
+
+      <div class="synth-obj obj-long">
+        <div class="synth-obj-icon">🌱</div>
+        <div class="synth-obj-body">
+          <h4>Long terme <span>— vie future d'adulte</span></h4>
+          <p>Ancrer des <strong>habitudes durables</strong> d'activité physique et de gestion de la sédentarité, afin de limiter à long terme
+          les risques de troubles musculo-squelettiques, cardio-vasculaires et de sédentarité chronique. Le bilan Sport Santé devient ainsi
+          un outil de <strong>prévention sur toute une vie</strong>, pas seulement une évaluation ponctuelle de L1.</p>
+        </div>
+      </div>
+    </div>
   `;
 }
 
