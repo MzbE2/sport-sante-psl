@@ -2483,6 +2483,7 @@ function etudiantsDeSession(sessionId) {
 }
 
 window.demarrerSession = async function() {
+  const nom   = (document.getElementById("sess-nom")?.value || "").trim();
   const date  = document.getElementById("sess-date").value;
   const debut = document.getElementById("sess-debut").value;
   if (!date || !debut) { alert("Merci d'indiquer la date et l'heure de début."); return; }
@@ -2498,7 +2499,7 @@ window.demarrerSession = async function() {
   }
   const id = "s" + Date.now();
   await set(ref(db, `sessions/${id}`), {
-    date, debut, fin: "",
+    nom, date, debut, fin: "",
     encadrants: [nomEncadrant()],
     statut: "ouverte",
     createdAt: Date.now(),
@@ -2506,13 +2507,16 @@ window.demarrerSession = async function() {
   });
 };
 
-window.ajusterSession = async function(id) {
+window.ajusterSession = async function(id, prefix) {
+  prefix = prefix || "sess-edit-";
   const s = allSessions[id]; if (!s) return;
-  const date  = document.getElementById("sess-edit-date").value;
-  const debut = document.getElementById("sess-edit-debut").value;
-  const fin   = document.getElementById("sess-edit-fin").value;
+  const nom   = (document.getElementById(prefix + "nom")?.value || "").trim();
+  const date  = document.getElementById(prefix + "date").value;
+  const debut = document.getElementById(prefix + "debut").value;
+  const fin   = document.getElementById(prefix + "fin").value;
   if (!date || !debut) { alert("Date et heure de début requises."); return; }
-  await update(ref(db, `sessions/${id}`), { date, debut, fin: fin || "" });
+  await update(ref(db, `sessions/${id}`), { nom, date, debut, fin: fin || "" });
+  if (prefix === "sess-admin-edit-") renderSessAdminEntete(id);
 };
 
 window.terminerSession = async function(id) {
@@ -2546,6 +2550,8 @@ function renderSessionProf() {
           Aucune session en cours. Dès que vous démarrez une session, les étudiants qui se connectent
           apparaissent automatiquement ici comme présents.
         </p>
+        <label style="font-size:13px;font-weight:600">Nom de la session <span style="font-weight:400;color:var(--muted)">(optionnel)</span></label>
+        <input type="text" id="sess-nom" placeholder="Ex : LSO groupe A, rattrapage MIDO…" style="margin-bottom:10px">
         <label style="font-size:13px;font-weight:600">Date</label>
         <input type="date" id="sess-date" value="${aujourdHui}" style="margin-bottom:10px">
         <label style="font-size:13px;font-weight:600">Heure de début</label>
@@ -2603,7 +2609,7 @@ function renderSessionProf() {
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:10px">
         <div>
-          <h3 style="margin:0 0 4px">🟢 Session en cours</h3>
+          <h3 style="margin:0 0 4px">🟢 ${s.nom ? esc(s.nom) : "Session en cours"}</h3>
           <div style="font-size:13px;color:var(--muted)">${formatDateFR(s.date)} · ${esc(s.debut)}${s.fin ? " – " + esc(s.fin) : ""}</div>
           <div style="font-size:13px;color:var(--muted);margin-top:2px">👤 Encadrants : ${(s.encadrants || []).map(esc).join(", ")}</div>
         </div>
@@ -2613,8 +2619,9 @@ function renderSessionProf() {
         </div>
       </div>
       <details style="margin-bottom:10px">
-        <summary style="cursor:pointer;font-size:13px;color:var(--muted)">✏️ Ajuster la date / l'heure de ce créneau</summary>
+        <summary style="cursor:pointer;font-size:13px;color:var(--muted)">✏️ Ajuster le nom / la date / l'heure de ce créneau</summary>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+          <div style="flex:1;min-width:200px"><label style="font-size:12px;font-weight:600">Nom de la session</label><input type="text" id="sess-edit-nom" value="${esc(s.nom || "")}" placeholder="Ex : LSO groupe A" style="margin-bottom:0"></div>
           <div><label style="font-size:12px;font-weight:600">Date</label><input type="date" id="sess-edit-date" value="${s.date}" style="margin-bottom:0"></div>
           <div><label style="font-size:12px;font-weight:600">Début</label><input type="time" id="sess-edit-debut" value="${s.debut}" style="margin-bottom:0"></div>
           <div><label style="font-size:12px;font-weight:600">Fin</label><input type="time" id="sess-edit-fin" value="${s.fin || ""}" style="margin-bottom:0"></div>
@@ -2710,7 +2717,7 @@ function renderAdminSessions() {
       <div class="scard" style="cursor:pointer" onclick="ouvrirSessionDetail('${id}')">
         <div class="shead">
           <div>
-            <div class="student-name">${formatDateFR(s.date)}</div>
+            <div class="student-name">${s.nom ? `${esc(s.nom)} <span style="font-weight:400;color:var(--muted);font-size:13px">— ${formatDateFR(s.date)}</span>` : formatDateFR(s.date)}</div>
             <div class="smeta-row">
               <span class="filiere-tag">${esc(s.debut || "")}${s.fin ? " – " + esc(s.fin) : ""}</span>
               <span class="filiere-tag" style="background:var(--bleu-cl);color:var(--bleu)">${(s.encadrants || []).map(esc).join(", ") || "—"}</span>
@@ -2731,14 +2738,31 @@ window.renderAdminSessions = renderAdminSessions;
 
 let sessionDetailId = null; // session actuellement affichée en page détail
 
+function renderSessAdminEntete(id) {
+  const s = allSessions[id]; if (!s) return;
+  document.getElementById("sess-detail-entete").innerHTML = `
+    <h3 style="margin-bottom:6px">📅 ${s.nom ? esc(s.nom) : formatDateFR(s.date)}</h3>
+    ${s.nom ? `<p style="font-size:13px;color:var(--muted);margin-bottom:2px">${formatDateFR(s.date)}</p>` : ""}
+    <p style="font-size:14px;margin-bottom:4px"><strong>${esc(s.debut || "")}${s.fin ? " – " + esc(s.fin) : ""}</strong></p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:8px">👤 ${(s.encadrants || []).map(esc).join(", ") || "Aucun encadrant"}</p>
+    <details class="no-print">
+      <summary style="cursor:pointer;font-size:13px;color:var(--muted)">✏️ Renommer / ajuster ce créneau</summary>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <div style="flex:1;min-width:200px"><label style="font-size:12px;font-weight:600">Nom de la session</label><input type="text" id="sess-admin-edit-nom" value="${esc(s.nom || "")}" placeholder="Ex : LSO groupe A" style="margin-bottom:0"></div>
+        <div><label style="font-size:12px;font-weight:600">Date</label><input type="date" id="sess-admin-edit-date" value="${s.date}" style="margin-bottom:0"></div>
+        <div><label style="font-size:12px;font-weight:600">Début</label><input type="time" id="sess-admin-edit-debut" value="${s.debut}" style="margin-bottom:0"></div>
+        <div><label style="font-size:12px;font-weight:600">Fin</label><input type="time" id="sess-admin-edit-fin" value="${s.fin || ""}" style="margin-bottom:0"></div>
+      </div>
+      <button class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:13px;margin-top:8px" onclick="ajusterSession('${id}', 'sess-admin-edit-')">Enregistrer</button>
+    </details>`;
+}
+window.renderSessAdminEntete = renderSessAdminEntete;
+
 function ouvrirSessionDetail(id) {
   const s = allSessions[id]; if (!s) return;
   sessionDetailId = id;
 
-  document.getElementById("sess-detail-entete").innerHTML = `
-    <h3 style="margin-bottom:6px">📅 ${formatDateFR(s.date)}</h3>
-    <p style="font-size:14px;margin-bottom:4px"><strong>${esc(s.debut || "")}${s.fin ? " – " + esc(s.fin) : ""}</strong></p>
-    <p style="font-size:13px;color:var(--muted)">👤 ${(s.encadrants || []).map(esc).join(", ") || "Aucun encadrant"}</p>`;
+  renderSessAdminEntete(id);
 
   // Réinitialise les filtres à chaque ouverture
   document.getElementById("sess-detail-recherche").value = "";
@@ -2767,7 +2791,7 @@ async function supprimerSession(id) {
   const etus = etudiantsSession(id);
   const enCours = s.statut === "ouverte";
   const avert = enCours ? "\n\n⚠️ Cette session est actuellement EN COURS." : "";
-  if (!confirm(`Supprimer la session du ${formatDateFR(s.date)} (${s.debut || ""}${s.fin ? " – " + s.fin : ""}) ?\n\n${etus.length} étudiant(s) y sont rattaché(s) — leurs résultats seront conservés, seule la fiche de session sera supprimée.${avert}\n\nCette action est irréversible.`)) return;
+  if (!confirm(`Supprimer la session${s.nom ? " « " + s.nom + " »" : ""} du ${formatDateFR(s.date)} (${s.debut || ""}${s.fin ? " – " + s.fin : ""}) ?\n\n${etus.length} étudiant(s) y sont rattaché(s) — leurs résultats seront conservés, seule la fiche de session sera supprimée.${avert}\n\nCette action est irréversible.`)) return;
   try {
     await remove(ref(db, `sessions/${id}`));
     if (sessionDetailId === id) retourListeSessions();
