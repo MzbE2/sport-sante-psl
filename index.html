@@ -1004,6 +1004,11 @@
         <h3 style="margin:0">👤 Gestion des utilisateurs</h3>
         <button class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" onclick="ouvrirModalCreation('admin')">➕ Créer un compte</button>
       </div>
+      <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+        <input id="admin-users-search" type="text" placeholder="🔎 Rechercher un étudiant par nom, prénom ou email…" oninput="adminFiltrerUtilisateurs()" style="margin-bottom:0; flex:2; min-width:220px">
+        <button id="admin-users-dup-btn" class="btn btn-outline" style="width:auto;padding:8px 14px;font-size:13px;white-space:nowrap" onclick="toggleAdminUsersDupOnly()">🔁 Voir les doublons potentiels</button>
+      </div>
+      <div id="admin-users-dup-info" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
       <div id="admin-users-container"><div class="loading">Chargement…</div></div>
     </div>
   </div>
@@ -1592,6 +1597,8 @@ let currentRole = null;
 let currentUserData = null;
 let allResultats = {};
 let allUsers    = {};
+let adminUsersSearch  = "";     // texte de recherche dans l'onglet Utilisateurs (admin)
+let adminUsersDupOnly = false;  // affiche uniquement les doublons potentiels
 let editUID     = null;
 let previewRole = null;                // rôle actuellement prévisualisé par un admin ("etudiant"/"prof"/"admin")
 let previewInit = { etudiant: false, prof: false }; // évite de ré-attacher les écouteurs à chaque bascule
@@ -3534,20 +3541,163 @@ function renderAdminSynthese() {
 }
 window.renderAdminSynthese = renderAdminSynthese;
 
+// ── Détection de doublons (ex: même étudiant inscrit 2x, coquille sur le prénom) ──
+function normKey(s) {
+  return (s || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // enlève les accents
+    .toLowerCase()
+    .replace(/[^a-z]/g, ""); // enlève espaces, tirets, apostrophes, chiffres...
+}
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = new Array(n + 1);
+  let curr = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
+}
+
+// Deux comptes sont considérés comme doublons potentiels si le nom de famille
+// est identique (ou quasi) et que le prénom est proche (coquille probable).
+function estDoublonPotentiel(a, b) {
+  const nomA = normKey(a.nom), nomB = normKey(b.nom);
+  const preA = normKey(a.prenom), preB = normKey(b.prenom);
+  if (!nomA || !nomB) return false;
+
+  if (nomA === nomB) {
+    if (preA === preB) return true; // nom + prénom identiques → doublon quasi certain
+    if (!preA || !preB) return false;
+    // coquille sur le prénom : distance d'édition faible par rapport à la longueur
+    const dist = levenshtein(preA, preB);
+    const seuil = Math.max(1, Math.min(3, Math.floor(Math.min(preA.length, preB.length) / 2)));
+    return dist <= seuil;
+  }
+
+  // légère coquille possible aussi sur le nom de famille, si le prénom colle bien
+  if (nomA.length >= 3 && nomB.length >= 3 && levenshtein(nomA, nomB) <= 1) {
+    if (preA && preB && levenshtein(preA, preB) <= 2) return true;
+  }
+  return false;
+}
+
+// Regroupe tous les utilisateurs en groupes de doublons potentiels (union-find).
+function calculerGroupesDoublons(rows) {
+  const n = rows.length;
+  const parent = Array.from({ length: n }, (_, i) => i);
+  function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+  function union(x, y) { const rx = find(x), ry = find(y); if (rx !== ry) parent[rx] = ry; }
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (estDoublonPotentiel(rows[i][1], rows[j][1])) union(i, j);
+    }
+  }
+
+  // regroupe par racine, ne garde que les groupes de 2+ personnes
+  const parGroupe = {};
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    (parGroupe[r] = parGroupe[r] || []).push(i);
+  }
+  const uidVersGroupe = {}; // uid -> numéro de groupe (1, 2, 3...)
+  let compteur = 0;
+  Object.values(parGroupe).forEach(indices => {
+    if (indices.length < 2) return;
+    compteur++;
+    indices.forEach(i => { uidVersGroupe[rows[i][0]] = compteur; });
+  });
+  return { uidVersGroupe, nbGroupes: compteur };
+}
+
+const COULEURS_DOUBLONS = ["#fff3cd", "#ffe0e0", "#e0f0ff", "#e6ffe6", "#f3e0ff", "#fff0d9"];
+
+function adminFiltrerUtilisateurs() {
+  adminUsersSearch = (document.getElementById("admin-users-search")?.value || "");
+  renderAdminUsers();
+}
+
+function toggleAdminUsersDupOnly() {
+  adminUsersDupOnly = !adminUsersDupOnly;
+  renderAdminUsers();
+}
+window.adminFiltrerUtilisateurs = adminFiltrerUtilisateurs;
+window.toggleAdminUsersDupOnly  = toggleAdminUsersDupOnly;
+
 function renderAdminUsers() {
   const container = document.getElementById("admin-users-container");
   if (!container) return;
-  const rows = Object.entries(allUsers);
-  if (!rows.length) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun utilisateur.</p>"; return; }
+  const allRows = Object.entries(allUsers);
+  if (!allRows.length) { container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun utilisateur.</p>"; return; }
+
+  // Détection des doublons calculée sur l'ensemble des utilisateurs (avant filtrage)
+  const { uidVersGroupe, nbGroupes } = calculerGroupesDoublons(allRows);
+
+  // Mise à jour du bouton et du texte d'info doublons
+  const dupBtn = document.getElementById("admin-users-dup-btn");
+  if (dupBtn) {
+    dupBtn.classList.toggle("btn-primary", adminUsersDupOnly);
+    dupBtn.classList.toggle("btn-outline", !adminUsersDupOnly);
+    dupBtn.textContent = adminUsersDupOnly ? "🔁 Voir tous les utilisateurs" : "🔁 Voir les doublons potentiels";
+  }
+  const dupInfo = document.getElementById("admin-users-dup-info");
+  if (dupInfo) {
+    dupInfo.innerHTML = nbGroupes
+      ? `⚠️ <strong>${nbGroupes}</strong> groupe${nbGroupes>1?"s":""} de doublon${nbGroupes>1?"s":""} potentiel${nbGroupes>1?"s":""} détecté${nbGroupes>1?"s":""} (même nom, prénom proche — coquille probable).`
+      : `✅ Aucun doublon potentiel détecté.`;
+  }
+
+  // Filtrage par recherche texte
+  const q = normKey(adminUsersSearch);
+  let rows = allRows.filter(([uid, u]) => {
+    if (q) {
+      const hay = normKey(`${u.prenom||""} ${u.nom||""} ${u.email||""}`);
+      if (!hay.includes(q)) return false;
+    }
+    if (adminUsersDupOnly && !uidVersGroupe[uid]) return false;
+    return true;
+  });
+
+  // Trie les doublons ensemble pour faciliter la comparaison / suppression
+  rows.sort((a, b) => {
+    const ga = uidVersGroupe[a[0]] || 0, gb = uidVersGroupe[b[0]] || 0;
+    if (ga !== gb) {
+      if (ga === 0) return 1;
+      if (gb === 0) return -1;
+      return ga - gb;
+    }
+    return (a[1].nom || "").localeCompare(b[1].nom || "");
+  });
+
+  if (!rows.length) {
+    container.innerHTML = "<p style='color:var(--muted);font-size:13px'>Aucun utilisateur ne correspond à cette recherche.</p>";
+    return;
+  }
+
   container.innerHTML = `
     <table class="admin-table">
       <thead><tr>
         <th>Nom</th><th>Email</th><th>Rôle</th><th>Filière</th><th>Sexe</th><th>Inscrit le</th><th>Action</th>
       </tr></thead>
       <tbody>
-        ${rows.map(([uid, u]) => `
-          <tr>
-            <td>${u.prenom||""} ${(u.nom||"").toUpperCase()}</td>
+        ${rows.map(([uid, u]) => {
+          const groupe = uidVersGroupe[uid];
+          const bg = groupe ? COULEURS_DOUBLONS[(groupe - 1) % COULEURS_DOUBLONS.length] : "";
+          return `
+          <tr${bg ? ` style="background:${bg}"` : ""}>
+            <td>
+              ${u.prenom||""} ${(u.nom||"").toUpperCase()}
+              ${groupe ? `<div style="font-size:10px;font-weight:700;color:#8a5a00">⚠️ Doublon possible — groupe ${groupe}</div>` : ""}
+            </td>
             <td style="font-size:12px">${u.email||""}</td>
             <td>
               <select onchange="changerRole('${uid}', this.value)" style="width:auto;margin:0;padding:4px 8px;font-size:12px">
@@ -3579,7 +3729,7 @@ function renderAdminUsers() {
               ? `<span style="font-size:11px;color:var(--muted)">(vous)</span>`
               : `<button class="btn btn-danger btn-sm" onclick="supprimerUtilisateur('${uid}')" title="Supprimer">🗑️</button>`}</td>
           </tr>
-        `).join("")}
+        `;}).join("")}
       </tbody>
     </table>
   `;
