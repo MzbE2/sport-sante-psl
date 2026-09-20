@@ -953,7 +953,8 @@
           <select id="sess-filtre-encadrant" onchange="renderAdminSessions()" style="width:auto; margin-bottom:0; flex:1; min-width:180px">
             <option value="">Tous les encadrants</option>
           </select>
-          <button class="btn btn-primary" style="width:auto; padding:8px 16px; font-size:13px; white-space:nowrap" onclick="exporterEtudiantsParFiliere()" title="Liste des étudiants ayant fini tous les tests, classés par filière, à transmettre au secrétariat">📥 Exporter pour le secrétariat (par filière)</button>
+          <button class="btn btn-primary" style="width:auto; padding:8px 16px; font-size:13px; white-space:nowrap" onclick="exporterEtudiantsParFiliere()" title="Liste des étudiants présents ou ayant fait au moins un test (même incomplet), classés par filière : fichier Excel">📥 Export secrétariat — Excel</button>
+          <button class="btn btn-primary" style="width:auto; padding:8px 16px; font-size:13px; white-space:nowrap" onclick="exporterEtudiantsParFilierePDF()" title="Même liste au format PDF : une page par filière, prête à imprimer ou à envoyer">📄 Export secrétariat — PDF</button>
         </div>
         <div id="sess-export-statut" style="font-size:12.5px; color:var(--muted); margin:-4px 0 12px"></div>
         <div id="admin-sessions-container"><div class="loading">Chargement…</div></div>
@@ -1246,6 +1247,8 @@
 <!-- ============================================================ -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail }
@@ -2739,25 +2742,22 @@ function renderAdminSessions() {
 }
 window.renderAdminSessions = renderAdminSessions;
 
-// ── Export secrétariat : étudiants ayant fini TOUS les tests, classés par filière ──
-// Fichier Excel : 1 onglet « Toutes filières » + 1 onglet par filière.
-// Seules des données administratives sont exportées (identité, filière, date/heure, encadrant) :
+// ── Export secrétariat : étudiants PRÉSENTS (rattachés à une session ou ayant fait ≥ 1 test), même si incomplet ──
+// Excel : 1 onglet « Toutes filières » + 1 onglet par filière.  PDF : 1 page de synthèse + 1 page par filière.
+// Seules des données administratives sont exportées (identité, filière, date/heure, encadrant, nb de tests) :
 // aucun résultat de test ni donnée de santé.
-function exporterEtudiantsParFiliere() {
-  const statut = document.getElementById("sess-export-statut");
+const EXPORT_ENTETES = ["Nom", "Prénom", "Email", "Filière", "Date de passage", "Horaire", "Encadrant(s)", "Tests réalisés"];
+
+function collecterEtudiantsPourSecretariat() {
   const dateFR = iso => iso ? iso.split("-").reverse().join("/") : "";
   const nbTests = r => r.tests ? Object.keys(r.tests).length : 0;
 
   const etudiants = Object.values(allResultats)
     .filter(r => r.meta && r.meta.filiere && r.meta.demo !== true);   // vrais étudiants uniquement
-  const termines = etudiants.filter(r => nbTests(r) >= TESTS.length);
+  // Présent = rattaché à une session (présence enregistrée à la connexion) OU au moins un test saisi.
+  const presents = etudiants.filter(r => r.meta.sessionId || nbTests(r) > 0);
 
-  if (!termines.length) {
-    alert("Aucun étudiant n'a encore terminé tous les tests : rien à exporter.");
-    return;
-  }
-
-  const lignes = termines.map(r => {
+  const lignes = presents.map(r => {
     const m = r.meta, sess = allSessions[m.sessionId] || {};
     return {
       nom: (m.nom || "").toUpperCase(),
@@ -2765,48 +2765,149 @@ function exporterEtudiantsParFiliere() {
       email: m.email || "",
       filiere: m.filiere,
       date: dateFR(sess.date),
-      horaire: sess.debut ? sess.debut + (sess.fin ? " – " + sess.fin : "") : "",
-      encadrants: (sess.encadrants || []).join(", ")
+      horaire: sess.debut ? sess.debut + (sess.fin ? " - " + sess.fin : "") : "",
+      encadrants: (sess.encadrants || []).join(", "),
+      tests: `${nbTests(r)}/${TESTS.length}`,
+      incomplet: nbTests(r) < TESTS.length
     };
   }).sort((a, b) =>
     a.filiere.localeCompare(b.filiere, "fr") ||
     a.nom.localeCompare(b.nom, "fr") ||
     a.prenom.localeCompare(b.prenom, "fr"));
 
-  const filieres = [...new Set(lignes.map(l => l.filiere))];
-  const ENTETES = ["Nom", "Prénom", "Email", "Filière", "Date de passage", "Horaire", "Encadrant(s)"];
-  const versTableau = rows => rows.map(l => [l.nom, l.prenom, l.email, l.filiere, l.date, l.horaire, l.encadrants]);
+  return {
+    lignes,
+    filieres: [...new Set(lignes.map(l => l.filiere))],
+    incomplets: lignes.filter(l => l.incomplet).length,
+    absents: etudiants.length - presents.length
+  };
+}
+const versTableauExport = rows => rows.map(l => [l.nom, l.prenom, l.email, l.filiere, l.date, l.horaire, l.encadrants, l.tests]);
+
+function afficherBilanExport(d) {
+  const statut = document.getElementById("sess-export-statut");
+  if (!statut) return;
+  const parFiliere = d.filieres.map(f => `${esc(f)} : ${d.lignes.filter(l => l.filiere === f).length}`).join(" · ");
+  statut.innerHTML =
+    `✓ <strong>${d.lignes.length} étudiant${d.lignes.length > 1 ? "s" : ""}</strong> exporté${d.lignes.length > 1 ? "s" : ""} (${parFiliere})` +
+    (d.incomplets > 0 ? ` — dont ${d.incomplets} avec des tests incomplets` : "") +
+    (d.absents > 0 ? ` — ${d.absents} inscrit${d.absents > 1 ? "s" : ""} sans présence ni test (non inclus).` : ".");
+}
+
+function exporterEtudiantsParFiliere() {   // Excel
+  const d = collecterEtudiantsPourSecretariat();
+  if (!d.lignes.length) { alert("Aucun étudiant présent ou ayant fait au moins un test : rien à exporter."); return; }
   const aujourdhui = new Date().toISOString().slice(0, 10);
 
   if (typeof XLSX !== "undefined") {
     const wb = XLSX.utils.book_new();
     const feuille = rows => {
-      const ws = XLSX.utils.aoa_to_sheet([ENTETES, ...versTableau(rows)]);
-      ws["!cols"] = [{wch:22},{wch:18},{wch:38},{wch:16},{wch:16},{wch:15},{wch:30}];
+      const ws = XLSX.utils.aoa_to_sheet([EXPORT_ENTETES, ...versTableauExport(rows)]);
+      ws["!cols"] = [{wch:22},{wch:18},{wch:38},{wch:16},{wch:16},{wch:15},{wch:30},{wch:14}];
       return ws;
     };
-    XLSX.utils.book_append_sheet(wb, feuille(lignes), "Toutes filières");
-    filieres.forEach(f => XLSX.utils.book_append_sheet(
-      wb, feuille(lignes.filter(l => l.filiere === f)), f.replace(/[\\\/\?\*\[\]:]/g, "-").slice(0, 31)));
+    XLSX.utils.book_append_sheet(wb, feuille(d.lignes), "Toutes filières");
+    d.filieres.forEach(f => XLSX.utils.book_append_sheet(
+      wb, feuille(d.lignes.filter(l => l.filiere === f)), f.replace(/[\\\/\?\*\[\]:]/g, "-").slice(0, 31)));
     XLSX.writeFile(wb, `etudiants-tests-par-filiere-${aujourdhui}.xlsx`);
   } else {
     // Secours si la librairie Excel n'a pas pu se charger : CSV lisible dans Excel (accents OK).
     const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const csv = "\uFEFF" + [ENTETES, ...versTableau(lignes)].map(row => row.map(q).join(";")).join("\r\n");
+    const csv = "\uFEFF" + [EXPORT_ENTETES, ...versTableauExport(d.lignes)].map(row => row.map(q).join(";")).join("\r\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     a.download = `etudiants-tests-par-filiere-${aujourdhui}.csv`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
-
-  const parFiliere = filieres.map(f => `${esc(f)} : ${lignes.filter(l => l.filiere === f).length}`).join(" · ");
-  const manquants = etudiants.length - termines.length;
-  if (statut) statut.innerHTML =
-    `✓ <strong>${lignes.length} étudiant${lignes.length > 1 ? "s" : ""}</strong> exporté${lignes.length > 1 ? "s" : ""} (${parFiliere})` +
-    (manquants > 0 ? ` — ${manquants} autre${manquants > 1 ? "s" : ""} n'${manquants > 1 ? "ont" : "a"} pas fini tous les tests (non inclus).` : ".");
+  afficherBilanExport(d);
 }
 window.exporterEtudiantsParFiliere = exporterEtudiantsParFiliere;
+
+function exporterEtudiantsParFilierePDF() {
+  const JsPDF = window.jspdf && window.jspdf.jsPDF;
+  if (!JsPDF) {
+    alert("La bibliothèque PDF n'a pas pu se charger (connexion internet ?). Rechargez la page avec Ctrl+F5 puis réessayez, ou utilisez l'export Excel.");
+    return;
+  }
+  const d = collecterEtudiantsPourSecretariat();
+  if (!d.lignes.length) { alert("Aucun étudiant présent ou ayant fait au moins un test : rien à exporter."); return; }
+
+  const doc = new JsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const BLEU = [26, 86, 160];
+  const aujourdhui = new Date();
+  const dateLisible = aujourdhui.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+
+  // Page 1 : titre + synthèse par filière
+  doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(...BLEU);
+  doc.text("Sport Santé PSL Dauphine", 14, 20);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(13); doc.setTextColor(50);
+  doc.text("Étudiants présents aux tests, par filière", 14, 29);
+  doc.setFontSize(10); doc.setTextColor(110);
+  doc.text(`Liste établie le ${dateLisible} - ${d.lignes.length} étudiant${d.lignes.length > 1 ? "s" : ""} au total`, 14, 36);
+
+  doc.autoTable({
+    startY: 44,
+    head: [["Filière", "Étudiants présents", "dont tests incomplets"]],
+    body: d.filieres.map(f => {
+      const g = d.lignes.filter(l => l.filiere === f);
+      return [f, String(g.length), String(g.filter(l => l.incomplet).length)];
+    }).concat([["TOTAL", String(d.lignes.length), String(d.incomplets)]]),
+    theme: "grid",
+    tableWidth: 130,
+    styles: { fontSize: 10, cellPadding: 2.5 },
+    headStyles: { fillColor: BLEU },
+    didParseCell: h => { if (h.section === "body" && h.row.index === d.filieres.length) h.cell.styles.fontStyle = "bold"; }
+  });
+  doc.setFontSize(9); doc.setTextColor(110);
+  doc.text("« Tests incomplets » : étudiants présents qui n'ont pas réalisé tous les tests (lignes surlignées dans le détail).",
+    14, doc.lastAutoTable.finalY + 8);
+
+  // Une page par filière
+  d.filieres.forEach(f => {
+    const rows = d.lignes.filter(l => l.filiere === f);
+    doc.addPage();
+    doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.setTextColor(...BLEU);
+    doc.text(`${f} - ${rows.length} étudiant${rows.length > 1 ? "s" : ""}`, 14, 16);
+    doc.autoTable({
+      startY: 22,
+      head: [["Nom", "Prénom", "Email", "Date de passage", "Horaire", "Encadrant(s)", "Tests"]],
+      body: rows.map(l => [l.nom, l.prenom, l.email, l.date, l.horaire, l.encadrants, l.tests]),
+      theme: "grid",
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: BLEU },
+      columnStyles: { 0: { fontStyle: "bold" }, 6: { halign: "center", cellWidth: 16 } },
+      margin: { left: 14, right: 14, bottom: 14 },
+      didParseCell: h => { if (h.section === "body" && rows[h.row.index].incomplet) h.cell.styles.fillColor = [255, 240, 214]; }
+    });
+  });
+
+  // Pied de page numéroté
+  const nbPages = doc.getNumberOfPages(), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  for (let i = 1; i <= nbPages; i++) {
+    doc.setPage(i); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(140);
+    doc.text(`Sport Santé PSL Dauphine - liste des étudiants présents - ${dateLisible}`, 14, H - 7);
+    doc.text(`Page ${i} / ${nbPages}`, W - 14, H - 7, { align: "right" });
+  }
+  doc.save(`etudiants-tests-par-filiere-${aujourdhui.toISOString().slice(0, 10)}.pdf`);
+  afficherBilanExport(d);
+}
+window.exporterEtudiantsParFilierePDF = exporterEtudiantsParFilierePDF;
+
+// Résumé « où / quand / avec qui » d'un étudiant, d'après la session à laquelle il est rattaché.
+function resumeSessionEtudiant(r) {
+  const sid = r.meta?.sessionId;
+  if (!sid) return { session: "Aucune session rattachée", encadrants: "—", lie: false };
+  const sess = allSessions[sid];
+  if (!sess) return { session: "Session supprimée", encadrants: "—", lie: true };
+  const date = sess.date ? sess.date.split("-").reverse().join("/") : "";
+  const horaire = sess.debut ? sess.debut + (sess.fin ? "–" + sess.fin : "") : "";
+  return {
+    session: [sess.nom, date, horaire].filter(Boolean).join(" · "),
+    encadrants: (sess.encadrants || []).join(", ") || "—",
+    lie: true
+  };
+}
 
 let sessionDetailId = null; // session actuellement affichée en page détail
 
@@ -3237,6 +3338,7 @@ function renderAdminResultats() {
       <thead><tr>
         <th>Étudiant</th>
         <th>Filière</th>
+        <th>Session / Encadrant</th>
         <th>Sexe</th>
         <th>Verdict</th>
         ${TESTS.map(t => `<th title="${esc(t.nom)}">${esc(t.abbr || t.id.toUpperCase())}</th>`).join("")}
@@ -3252,6 +3354,7 @@ function renderAdminResultats() {
           <tr ${verdict.niveau === "accompagner" ? 'style="background:'+COULEUR_CLAIR.rouge+'"' : ''}>
             <td><strong style="font-size:13px">${verdict.niveau==="accompagner"?"🚩 ":""}${r.meta?.prenom||""} ${(r.meta?.nom||"").toUpperCase()}</strong><br><span style="color:var(--muted);font-size:10px">${r.meta?.email||""}</span></td>
             <td><span class="filiere-tag">${r.meta?.filiere||"—"}</span></td>
+            <td style="font-size:11px;line-height:1.5;min-width:150px">${(() => { const rs = resumeSessionEtudiant(r); return rs.lie ? `📅 ${esc(rs.session)}<br>👤 ${esc(rs.encadrants)}` : `<span style="color:var(--muted)">${esc(rs.session)}</span>`; })()}</td>
             <td>${sexeCourt(r.meta?.sexe)}</td>
             <td style="text-align:center">${vCol ? `<span title="${verdict.titre}${verdict.nRouge?` — ${verdict.nRouge} en rouge`:""}" style="display:inline-block;width:15px;height:15px;border-radius:50%;background:${vCol.hex};vertical-align:middle"></span>` : "—"}</td>
             ${TESTS.map(t => {
@@ -4171,7 +4274,20 @@ function ouvrirEdit(uid) {
   editUID = uid;
   const r = allResultats[uid] || {};
   const fields = document.getElementById("modal-fields");
-  fields.innerHTML = TESTS.map(t => {
+  const m = r.meta || {};
+  const resume = resumeSessionEtudiant(r);
+  const fmt = ts => ts ? new Date(ts).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "";
+  const infoBloc = `
+    <div style="background:var(--gris);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12.5px;line-height:1.7">
+      <strong>${esc(m.prenom || "")} ${esc((m.nom || "").toUpperCase())}</strong> · ${esc(m.filiere || "—")}<br>
+      <span style="color:var(--muted)">${esc(m.email || "")}</span><br>
+      📅 Session : ${esc(resume.session)}<br>
+      👤 Encadrant(s) : ${esc(resume.encadrants)}<br>
+      ${m.presentAt ? `🕒 Présence enregistrée le ${fmt(m.presentAt)}<br>` : ""}
+      ${m.createdAt ? `🆕 Compte créé le ${fmt(m.createdAt)}${m.creePar ? ` (par : ${esc(m.creePar)})` : " (inscription par l'étudiant)"}<br>` : ""}
+      ${m.valide ? `✓ Bilan validé${m.validePar ? ` par ${m.validePar === "admin" ? "un administrateur" : esc(m.valideParNom || "un enseignant")}` : ""}${m.validatedAt ? ` le ${fmt(m.validatedAt)}` : ""}` : "⏳ Bilan non validé"}
+    </div>`;
+  fields.innerHTML = infoBloc + TESTS.map(t => {
     const v = r.tests?.[t.id];
     if (t.type === "choix") {
       const b = BAREMES[t.code] || { options: [] };
