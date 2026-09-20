@@ -2682,6 +2682,7 @@ async function initAdmin() {
     allSessions = snap.exists() ? snap.val() : {};
     remplirFiltreEncadrantSessions();
     renderAdminSessions();
+    renderAdminResultats();   // la colonne « Session / Encadrant » dépend des sessions : on la rafraîchit aussi
     renderDemoCompte();
   });
 }
