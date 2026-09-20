@@ -953,7 +953,9 @@
           <select id="sess-filtre-encadrant" onchange="renderAdminSessions()" style="width:auto; margin-bottom:0; flex:1; min-width:180px">
             <option value="">Tous les encadrants</option>
           </select>
+          <button class="btn btn-primary" style="width:auto; padding:8px 16px; font-size:13px; white-space:nowrap" onclick="exporterEtudiantsParFiliere()" title="Liste des étudiants ayant fini tous les tests, classés par filière, à transmettre au secrétariat">📥 Exporter pour le secrétariat (par filière)</button>
         </div>
+        <div id="sess-export-statut" style="font-size:12.5px; color:var(--muted); margin:-4px 0 12px"></div>
         <div id="admin-sessions-container"><div class="loading">Chargement…</div></div>
       </div>
     </div>
@@ -1243,6 +1245,7 @@
 <!--  SCRIPTS FIREBASE                                            -->
 <!-- ============================================================ -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail }
@@ -2735,6 +2738,75 @@ function renderAdminSessions() {
   }).join("");
 }
 window.renderAdminSessions = renderAdminSessions;
+
+// ── Export secrétariat : étudiants ayant fini TOUS les tests, classés par filière ──
+// Fichier Excel : 1 onglet « Toutes filières » + 1 onglet par filière.
+// Seules des données administratives sont exportées (identité, filière, date/heure, encadrant) :
+// aucun résultat de test ni donnée de santé.
+function exporterEtudiantsParFiliere() {
+  const statut = document.getElementById("sess-export-statut");
+  const dateFR = iso => iso ? iso.split("-").reverse().join("/") : "";
+  const nbTests = r => r.tests ? Object.keys(r.tests).length : 0;
+
+  const etudiants = Object.values(allResultats)
+    .filter(r => r.meta && r.meta.filiere && r.meta.demo !== true);   // vrais étudiants uniquement
+  const termines = etudiants.filter(r => nbTests(r) >= TESTS.length);
+
+  if (!termines.length) {
+    alert("Aucun étudiant n'a encore terminé tous les tests : rien à exporter.");
+    return;
+  }
+
+  const lignes = termines.map(r => {
+    const m = r.meta, sess = allSessions[m.sessionId] || {};
+    return {
+      nom: (m.nom || "").toUpperCase(),
+      prenom: m.prenom || "",
+      email: m.email || "",
+      filiere: m.filiere,
+      date: dateFR(sess.date),
+      horaire: sess.debut ? sess.debut + (sess.fin ? " – " + sess.fin : "") : "",
+      encadrants: (sess.encadrants || []).join(", ")
+    };
+  }).sort((a, b) =>
+    a.filiere.localeCompare(b.filiere, "fr") ||
+    a.nom.localeCompare(b.nom, "fr") ||
+    a.prenom.localeCompare(b.prenom, "fr"));
+
+  const filieres = [...new Set(lignes.map(l => l.filiere))];
+  const ENTETES = ["Nom", "Prénom", "Email", "Filière", "Date de passage", "Horaire", "Encadrant(s)"];
+  const versTableau = rows => rows.map(l => [l.nom, l.prenom, l.email, l.filiere, l.date, l.horaire, l.encadrants]);
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+
+  if (typeof XLSX !== "undefined") {
+    const wb = XLSX.utils.book_new();
+    const feuille = rows => {
+      const ws = XLSX.utils.aoa_to_sheet([ENTETES, ...versTableau(rows)]);
+      ws["!cols"] = [{wch:22},{wch:18},{wch:38},{wch:16},{wch:16},{wch:15},{wch:30}];
+      return ws;
+    };
+    XLSX.utils.book_append_sheet(wb, feuille(lignes), "Toutes filières");
+    filieres.forEach(f => XLSX.utils.book_append_sheet(
+      wb, feuille(lignes.filter(l => l.filiere === f)), f.replace(/[\\\/\?\*\[\]:]/g, "-").slice(0, 31)));
+    XLSX.writeFile(wb, `etudiants-tests-par-filiere-${aujourdhui}.xlsx`);
+  } else {
+    // Secours si la librairie Excel n'a pas pu se charger : CSV lisible dans Excel (accents OK).
+    const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const csv = "\uFEFF" + [ENTETES, ...versTableau(lignes)].map(row => row.map(q).join(";")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = `etudiants-tests-par-filiere-${aujourdhui}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  const parFiliere = filieres.map(f => `${esc(f)} : ${lignes.filter(l => l.filiere === f).length}`).join(" · ");
+  const manquants = etudiants.length - termines.length;
+  if (statut) statut.innerHTML =
+    `✓ <strong>${lignes.length} étudiant${lignes.length > 1 ? "s" : ""}</strong> exporté${lignes.length > 1 ? "s" : ""} (${parFiliere})` +
+    (manquants > 0 ? ` — ${manquants} autre${manquants > 1 ? "s" : ""} n'${manquants > 1 ? "ont" : "a"} pas fini tous les tests (non inclus).` : ".");
+}
+window.exporterEtudiantsParFiliere = exporterEtudiantsParFiliere;
 
 let sessionDetailId = null; // session actuellement affichée en page détail
 
