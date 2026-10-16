@@ -860,10 +860,17 @@
   <div id="tab-admin-resultats" class="content" style="display:none">
     <div class="card" style="border-left:5px solid var(--rouge)">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
-        <h3 style="margin:0;color:var(--rouge)">🚨 À voir d'urgence — Step test &gt; 135 bpm</h3>
+        <h3 style="margin:0;color:var(--rouge)">🚨 À voir d'urgence — Step test &gt; <span class="seuil-step-aff">135</span> bpm</h3>
         <button class="btn btn-danger" style="width:auto;padding:8px 14px;font-size:13px" onclick="exporterUrgenceStepPDF()">📄 Exporter la liste en PDF</button>
       </div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Étudiants dont la fréquence cardiaque au step test (après 1 min de repos) dépasse 135 bpm, du plus élevé au plus bas. Liste indépendante des filtres ci-dessous.</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Étudiants dont la fréquence cardiaque au step test (après 1 min de repos) dépasse <span class="seuil-step-aff">135</span> bpm, du plus élevé au plus bas. Liste indépendante des filtres ci-dessous.</p>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;background:var(--gris);border-radius:8px;padding:8px 12px">
+        <label for="seuil-step-input" style="margin:0;font-size:13px">Seuil d'alerte :</label>
+        <input type="number" id="seuil-step-input" value="135" min="60" max="220" step="1" style="width:90px;margin:0;padding:6px 8px">
+        <span style="font-size:13px;color:var(--muted)">bpm</span>
+        <button class="btn btn-outline" style="padding:6px 12px" onclick="enregistrerSeuilUrgenceStep()">Appliquer</button>
+        <span id="seuil-step-statut" style="font-size:12px;color:var(--muted)">Le seuil est enregistré pour tous les administrateurs. Aucun résultat n'est modifié.</span>
+      </div>
       <div id="admin-urgence-container"></div>
     </div>
     <div class="card">
@@ -2690,6 +2697,12 @@ async function initAdmin() {
   } catch (e) { /* droits insuffisants : on continue avec les défauts */ }
 
   renderAdminTests();
+  onValue(ref(db, "config/seuilUrgenceStep"), snap => {
+    const v = snap.exists() ? parseFloat(snap.val()) : NaN;
+    SEUIL_URGENCE_STEP = isNaN(v) ? SEUIL_URGENCE_STEP_DEFAUT : v;
+    majAffichageSeuilStep();
+    renderUrgenceStep();
+  }, () => { /* lecture refusée : on garde 135 */ });
   onValue(ref(db, "resultats"), snap => {
     allResultats = snap.exists() ? snap.val() : {};
     renderAdminStats();
@@ -3313,8 +3326,35 @@ function renderAdminStats() {
 
 function adminFiltrerResultats() { renderAdminResultats(); }
 
-// ── Liste d'urgence : Step test > 135 bpm (lecture seule) ──────
-const SEUIL_URGENCE_STEP = 135;
+// ── Liste d'urgence : Step test > seuil (lecture seule sur les résultats) ──
+// Seuil réglable par l'admin, stocké à part dans /config/seuilUrgenceStep (135 par défaut).
+const SEUIL_URGENCE_STEP_DEFAUT = 135;
+let SEUIL_URGENCE_STEP = SEUIL_URGENCE_STEP_DEFAUT;
+
+function majAffichageSeuilStep() {
+  document.querySelectorAll(".seuil-step-aff").forEach(el => el.textContent = SEUIL_URGENCE_STEP);
+  const inp = document.getElementById("seuil-step-input");
+  if (inp && document.activeElement !== inp) inp.value = SEUIL_URGENCE_STEP;
+}
+
+window.enregistrerSeuilUrgenceStep = async function() {
+  const v = parseFloat(document.getElementById("seuil-step-input").value);
+  const statut = document.getElementById("seuil-step-statut");
+  if (isNaN(v) || v < 60 || v > 220) { alert("Merci d'indiquer un seuil entre 60 et 220 bpm."); return; }
+  try {
+    await set(ref(db, "config/seuilUrgenceStep"), v);
+    SEUIL_URGENCE_STEP = v;
+    majAffichageSeuilStep();
+    renderUrgenceStep();
+    if (statut) { statut.textContent = `✓ Seuil réglé à ${v} bpm.`; statut.style.color = "var(--vert)"; }
+  } catch (e) {
+    // Si la base refuse l'écriture, on applique quand même le seuil pour cette session.
+    SEUIL_URGENCE_STEP = v;
+    majAffichageSeuilStep();
+    renderUrgenceStep();
+    if (statut) { statut.textContent = `Seuil appliqué à ${v} bpm pour cette session seulement (enregistrement refusé : ${e.message}).`; statut.style.color = "var(--orange)"; }
+  }
+};
 
 function collecterUrgenceStep() {
   const tStep = TESTS.find(t => t.code === "step");
