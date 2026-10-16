@@ -858,6 +858,14 @@
 
   <!-- Résultats -->
   <div id="tab-admin-resultats" class="content" style="display:none">
+    <div class="card" style="border-left:5px solid var(--rouge)">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+        <h3 style="margin:0;color:var(--rouge)">🚨 À voir d'urgence — Step test &gt; 135 bpm</h3>
+        <button class="btn btn-danger" style="width:auto;padding:8px 14px;font-size:13px" onclick="exporterUrgenceStepPDF()">📄 Exporter la liste en PDF</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Étudiants dont la fréquence cardiaque au step test (après 1 min de repos) dépasse 135 bpm, du plus élevé au plus bas. Liste indépendante des filtres ci-dessous.</p>
+      <div id="admin-urgence-container"></div>
+    </div>
     <div class="card">
       <h3>📋 Tous les résultats</h3>
       <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap">
@@ -1567,24 +1575,45 @@ function valeurLisible(test, valeur) {
   return valeur + (test.unite ? " " + test.unite : "");
 }
 
-// Verdict bienveillant d'un bilan (majorité de couleurs sur les 13 tests)
+// Familles de poids égal dans le verdict : IMC et Activité (Ricci) forment
+// ensemble UNE seule famille, à côté de Force, Endurance, Équilibre et Souplesse.
+function familleVerdict(categorie) {
+  return (categorie === "IMC" || categorie === "Activité") ? "IMC + Activité" : (categorie || "Autre");
+}
+
+// Verdict bienveillant d'un bilan.
+// Chaque famille de tests pèse le même poids dans le verdict, quel que soit
+// son nombre de tests (ex. 3 tests de force = 1/3 chacun, 1 test d'endurance = 1).
+// Seuls les tests effectivement saisis comptent. Calcul uniquement à l'affichage :
+// rien n'est écrit dans la base.
 function calcVerdict(r) {
   const meta = r.meta || {};
   const tests = r.tests || {};
   const age = ageDepuis(meta.anneeNaissance);
-  let nRouge=0, nOrange=0, nJaune=0, nVert=0, nBleu=0, total=0;
+  let nRouge=0, total=0;
   const parCouleur = { rouge:0, orange:0, jaune:0, vert:0, bleu:0 };
+  const parFamille = {}; // famille -> liste des couleurs obtenues
   TESTS.forEach(t => {
     const c = couleurResultat(t, tests[t.id], meta.sexe, age);
     if (!c) return;
     total++; parCouleur[c]++;
-    if (c==="rouge") nRouge++; else if (c==="orange") nOrange++;
-    else if (c==="jaune") nJaune++; else if (c==="vert") nVert++; else nBleu++;
+    if (c === "rouge") nRouge++;
+    const f = familleVerdict(t.categorie);
+    (parFamille[f] = parFamille[f] || []).push(c);
   });
   if (total === 0) return { niveau:"vide", nRouge:0, total:0 };
-  const aRevoir = nRouge + nOrange;   // rouge + orange
-  const moyen   = nJaune;             // jaune
-  const bon     = nVert + nBleu;      // vert + bleu
+  let aRevoir = 0, moyen = 0, bon = 0;
+  Object.values(parFamille).forEach(couleurs => {
+    const poids = 1 / couleurs.length;
+    couleurs.forEach(c => {
+      if (c === "rouge" || c === "orange") aRevoir += poids;
+      else if (c === "jaune") moyen += poids;
+      else bon += poids;
+    });
+  });
+  // arrondi pour éviter les faux écarts de virgule flottante (1/3 + 1/3 + 1/3)
+  const arr = x => Math.round(x * 1e6) / 1e6;
+  aRevoir = arr(aRevoir); moyen = arr(moyen); bon = arr(bon);
   let niveau;
   if (aRevoir >= moyen && aRevoir >= bon) niveau = "accompagner";
   else if (bon >= moyen && bon >= aRevoir) niveau = "forme";
@@ -3284,7 +3313,96 @@ function renderAdminStats() {
 
 function adminFiltrerResultats() { renderAdminResultats(); }
 
+// ── Liste d'urgence : Step test > 135 bpm (lecture seule) ──────
+const SEUIL_URGENCE_STEP = 135;
+
+function collecterUrgenceStep() {
+  const tStep = TESTS.find(t => t.code === "step");
+  if (!tStep) return [];
+  return Object.entries(allResultats)
+    .filter(([, r]) => r.meta && r.meta.filiere && r.meta.demo !== true)
+    .map(([uid, r]) => ({ uid, r, bpm: parseFloat(r.tests?.[tStep.id]) }))
+    .filter(x => !isNaN(x.bpm) && x.bpm > SEUIL_URGENCE_STEP)
+    .sort((a, b) => b.bpm - a.bpm || `${a.r.meta.nom||""}`.localeCompare(`${b.r.meta.nom||""}`, "fr"));
+}
+
+function renderUrgenceStep() {
+  const cont = document.getElementById("admin-urgence-container");
+  if (!cont) return;
+  if (!TESTS.find(t => t.code === "step")) {
+    cont.innerHTML = `<p style="color:var(--muted);font-size:13px">Le step test n'existe plus dans la liste des tests.</p>`;
+    return;
+  }
+  const liste = collecterUrgenceStep();
+  if (!liste.length) {
+    cont.innerHTML = `<p style="color:var(--vert);font-size:13px;font-weight:600">✅ Aucun étudiant au-dessus de ${SEUIL_URGENCE_STEP} bpm.</p>`;
+    return;
+  }
+  cont.innerHTML = `
+    <p style="font-size:13px;font-weight:700;color:var(--rouge);margin-bottom:8px">${liste.length} étudiant${liste.length>1?"s":""} à voir d'urgence</p>
+    <div style="overflow-x:auto"><table class="admin-table">
+      <thead><tr><th>Étudiant</th><th>Filière</th><th>Sexe</th><th>Step test</th><th>Session / Encadrant</th><th>Action</th></tr></thead>
+      <tbody>
+        ${liste.map(({ uid, r, bpm }) => {
+          const m = r.meta, rs = resumeSessionEtudiant(r);
+          return `<tr style="background:${COULEUR_CLAIR.rouge}">
+            <td><strong>${esc(m.prenom||"")} ${esc((m.nom||"").toUpperCase())}</strong><br><span style="color:var(--muted);font-size:10px">${esc(m.email||"")}</span></td>
+            <td><span class="filiere-tag">${esc(m.filiere)}</span></td>
+            <td>${sexeCourt(m.sexe)}</td>
+            <td style="color:var(--rouge);font-weight:800;font-size:13px">${bpm} bpm</td>
+            <td style="font-size:11px;line-height:1.5">${rs.lie ? `📅 ${esc(rs.session)}<br>👤 ${esc(rs.encadrants)}` : `<span style="color:var(--muted)">${esc(rs.session)}</span>`}</td>
+            <td><button class="btn btn-outline btn-sm" onclick="ouvrirEdit('${uid}')">✏️</button></td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table></div>`;
+}
+window.renderUrgenceStep = renderUrgenceStep;
+
+function exporterUrgenceStepPDF() {
+  const JsPDF = window.jspdf && window.jspdf.jsPDF;
+  if (!JsPDF) { alert("La bibliothèque PDF n'a pas pu se charger (connexion internet ?). Rechargez la page avec Ctrl+F5 puis réessayez."); return; }
+  const liste = collecterUrgenceStep();
+  if (!liste.length) { alert(`Aucun étudiant au-dessus de ${SEUIL_URGENCE_STEP} bpm : rien à exporter.`); return; }
+
+  const doc = new JsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const ROUGE = [192, 57, 43];
+  const aujourdhui = new Date();
+  const dateLisible = aujourdhui.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+
+  doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(...ROUGE);
+  doc.text("Étudiants à voir d'urgence - Step test", 14, 18);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90);
+  doc.text(`Sport Santé PSL Dauphine - fréquence cardiaque supérieure à ${SEUIL_URGENCE_STEP} bpm après le step test`, 14, 25);
+  doc.text(`Liste établie le ${dateLisible} - ${liste.length} étudiant${liste.length > 1 ? "s" : ""}`, 14, 31);
+
+  doc.autoTable({
+    startY: 37,
+    head: [["Nom", "Prénom", "Email", "Filière", "Sexe", "Step test", "Session", "Encadrant(s)"]],
+    body: liste.map(({ r, bpm }) => {
+      const m = r.meta, rs = resumeSessionEtudiant(r);
+      return [(m.nom || "").toUpperCase(), m.prenom || "", m.email || "", m.filiere || "", sexeCourt(m.sexe),
+              `${bpm} bpm`, rs.session, rs.encadrants];
+    }),
+    theme: "grid",
+    styles: { fontSize: 9, cellPadding: 2 },
+    headStyles: { fillColor: ROUGE },
+    columnStyles: { 0: { fontStyle: "bold" }, 5: { fontStyle: "bold", textColor: ROUGE, halign: "center" } },
+    margin: { left: 14, right: 14, bottom: 14 }
+  });
+
+  const nbPages = doc.getNumberOfPages(), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  for (let i = 1; i <= nbPages; i++) {
+    doc.setPage(i); doc.setFontSize(8); doc.setTextColor(140);
+    doc.text(`Document confidentiel - données de santé - ${dateLisible}`, 14, H - 7);
+    doc.text(`Page ${i} / ${nbPages}`, W - 14, H - 7, { align: "right" });
+  }
+  doc.save(`urgence-step-test-${aujourdhui.toISOString().slice(0, 10)}.pdf`);
+}
+window.exporterUrgenceStepPDF = exporterUrgenceStepPDF;
+
 function renderAdminResultats() {
+  renderUrgenceStep();
   const filtre = document.getElementById("admin-filtre-filiere")?.value || "";
   const search = (document.getElementById("admin-search")?.value || "").trim().toLowerCase();
   const container = document.getElementById("admin-resultats-container");
